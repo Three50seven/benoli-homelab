@@ -1,7 +1,7 @@
 2024.08.17
 Omada TP-Link SDN Controller
-192.168.3.253/24
-gw: 192.168.3.1
+192.168.1.252/24
+gw: 192.168.1.1
 8gb RAM, 1 CPU, 10GB Disk size
 
 #Tutorial link:

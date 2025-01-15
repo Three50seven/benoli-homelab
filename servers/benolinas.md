@@ -182,10 +182,3 @@ References: https://www.vinchin.com/vm-backup/proxmox-offsite-backup.html
 	By default additional mount points besides the Root Disk mount point are not included in backups. 
 	For volume mount points you can set the Backup option to include the mount point in the backup. 
 	Device and bind mounts are never backed up as their content is managed outside the Proxmox VE storage library.
-
-
-
-
-
-
-
