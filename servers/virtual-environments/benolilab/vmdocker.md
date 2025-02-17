@@ -221,6 +221,7 @@ nano /opt/plex/docker-compose.yml
 		- Verify Permissions: Check that the permissions are correctly set by listing the directory contents:
 		ls -l /mnt/naspool/Plex/library
 =======================
+```
 services:
   plex:
 	container_name: plex
@@ -241,6 +242,7 @@ services:
 	devices:
 	  - /dev/bus/usb:/dev/bus/usb	
 	  - /dev/dvb:/dev/dvb
+```
 =======================
 cd /opt/plex
 -deploy container as detached:
@@ -307,6 +309,24 @@ login via web browser:
 https://localhost:9443
 Replace localhost with the relevant IP address or FQDN if needed, and adjust the port if you changed it earlier.
 
+```
+portainer:
+    container_name: "portainer"
+    image: "portainer/portainer-ce:2.21.5"
+    ports:
+      - "9443:9443/tcp"
+    restart: "always"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "portainer_data:/data"
+    healthcheck:
+      test: "wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost:9443 || exit 1"
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+```
+
 -Updating Portainer
 
 -Backup Your Data: Before updating, it's a good idea to back up your Portainer data. This ensures you can restore your setup if anything goes wrong.
@@ -347,6 +367,7 @@ Paste in the docker compose yml:
 version: "3"
 services:
   watchtower:
+	container_name: watchtower
     image: containrrr/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -355,7 +376,7 @@ services:
       WATCHTOWER_DEBUG: true
       WATCHTOWER_ROLLING_RESTART: true
       WATCHTOWER_LABEL_ENABLE: true
-      WATCHTOWER_SCHEDULE: "* * 9 * * 5"
+      WATCHTOWER_SCHEDULE: "10 * 9 * * 5"	  
       WATCHTOWER_NOTIFICATION_REPORT: true
       WATCHTOWER_NOTIFICATION_URL: discord://token@channel
       WATCHTOWER_NOTIFICATION_TEMPLATE: |
@@ -402,3 +423,18 @@ com.centurylinklabs.watchtower.enable=true
 --Format for shoutrrr service
 https://discord.com/api/webhooks/webhookid/token
 discord://token@webhookid
+
+#Setup uptime-kuma - Notifications for containers
+```
+services:
+  uptime-kuma:
+	container_name: uptime-kuma
+    image: louislam/uptime-kuma:1
+    volumes:
+      - ./data:/app/data
+	  - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      # <Host Port>:<Container Port>
+      - 3001:3001
+    restart: unless-stopped
+```
