@@ -21,11 +21,10 @@ services:
           - "/var/run/docker.sock:/var/run/docker.sock"
           - "portainer_data:/data"
         healthcheck:
-            test: "wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost:9443 || exit 1"
-            interval: 60s
-            timeout: 5s
-            retries: 3
-            start_period: 10s
+              test: ["CMD-SHELL", "wget --no-check-certificate --spider -q https://localhost:9443/api/status || exit 1"]
+              interval: 1m30s
+              timeout: 30s
+              retries: 5
     watchtower:
         container_name: watchtower
         image: containrrr/watchtower
