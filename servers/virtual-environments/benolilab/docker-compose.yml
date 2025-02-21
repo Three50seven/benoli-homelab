@@ -1,0 +1,155 @@
+name: benolilab-docker
+secrets:
+    plex_claim:
+        file: ./secrets/.plex_claim
+    watchtower_discord_hook:
+        file: ./secrets/.watchtower_discord_hook
+    volume_backup_nas_ip:
+        file: ./secrets/.volume_backup_nas_ip
+    volume_backup_nas_user:
+        file: ./secrets/.volume_backup_nas_user
+    volume_backup_nas_pw:
+        file: ./secrets/.volume_backup_nas_pw
+services:
+    portainer:
+        container_name: "portainer"
+        image: "portainer/portainer-ce:2.27.0"
+        ports:
+          - "9443:9443/tcp"
+        restart: always
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock"
+          - "portainer_data:/data"
+        healthcheck:
+            test: "wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost:9443 || exit 1"
+            interval: 60s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+    watchtower:
+        container_name: watchtower
+        image: containrrr/watchtower
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        restart: unless-stopped
+        environment:
+            WATCHTOWER_CLEANUP: true
+            WATCHTOWER_DEBUG: true
+            WATCHTOWER_ROLLING_RESTART: true
+            WATCHTOWER_LABEL_ENABLE: true
+            WATCHTOWER_SCHEDULE: 0 0 9 * * 5
+            WATCHTOWER_NOTIFICATION_REPORT: true
+            WATCHTOWER_NOTIFICATION_URL: /run/secrets/watchtower_discord_hook
+            WATCHTOWER_NOTIFICATION_TEMPLATE: |
+                {{- if .Report -}}
+                    {{- with .Report -}}
+                {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+                    {{- range .Updated}}
+                - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+                    {{- end -}}
+                    {{- range .Fresh}}
+                - {{.Name}} ({{.ImageName}}): {{.State}}
+                    {{- end -}}
+                    {{- range .Skipped}}
+                - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+                    {{- end -}}
+                    {{- range .Failed}}
+                - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+                    {{- end -}}
+                    {{- end -}}
+                {{- else -}}
+                    {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
+                {{- end -}}
+        secrets:
+            - watchtower_discord_hook
+        healthcheck:
+              test: ["CMD", "/watchtower", "--health-check"]
+              interval: 1m30s
+              timeout: 10s
+              retries: 3
+              start_period: 40s
+        labels:
+            - com.centurylinklabs.watchtower.enable=true    
+    uptime-kuma:
+        container_name: uptime-kuma
+        image: louislam/uptime-kuma:1
+        volumes:
+            - ./data:/app/data
+            - /var/run/docker.sock:/var/run/docker.sock
+        ports:
+            # <Host Port>:<Container Port>
+            - 3001:3001
+        restart: unless-stopped
+        healthcheck:
+            test: "curl --connect-timeout 15 --max-time 100 --silent --show-error --fail 'http://localhost:3001/dashboard'"
+            interval: 1m
+            timeout: 15s
+            retries: 3
+            start_period: 1m
+    plex:
+        container_name: plex
+        image: linuxserver/plex
+        network_mode: host
+        ports:
+            - "32400:32400/tcp"
+        restart: unless-stopped
+        environment:
+            - TZ=America/New_York
+            #GET CLAIM FROM https://www.plex.tv/claim/
+            - PLEX_CLAIM=/run/secrets/plex_claim
+            - PUID=1000
+            - PGID=1000
+        volumes:
+            - /plex/database:/config
+            - /plex/transcode:/transcode
+            - /plex/media:/data
+            - /mnt/naspool:/naspool
+            - /mnt/sdb:/localmedia
+        devices:
+            - /dev/bus/usb:/dev/bus/usb	
+            - /dev/dvb:/dev/dvb
+        healthcheck:
+              test: "curl --connect-timeout 15 --max-time 100 --silent --show-error --fail 'http://localhost:32400/identity' >/dev/null"
+              interval: 1m
+              timeout: 15s
+              retries: 3
+              start_period: 1m
+        secrets:
+            - plex_claim
+    volumes_backup:
+        container_name: "docker-volume-backup"
+        image: offen/docker-volume-backup:latest
+        environment:
+            BACKUP_FILENAME: backup-%Y-%m-%dT%H-%M-%S.tar.gz
+            BACKUP_PRUNING_PREFIX: backup-
+            BACKUP_RETENTION_DAYS: 5
+            BACKUP_CRON_EXPRESSION: 0 3 * * *
+            SSH_HOST_NAME: /run/secrets/volume_backup_nas_ip
+            SSH_PORT: 22
+            SSH_USER: /run/secrets/volume_backup_nas_user
+            SSH_PASSWORD: /run/secrets/volume_backup_nas_pw
+            SSH_REMOTE_PATH: /naspool/backups/benolilab-docker/container-volumes
+        volumes:
+            - /etc/timezone:/etc/timezone:ro
+            - /etc/localtime:/etc/localtime:ro
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - /plex/database:/backup/plex_server_config:ro
+            - /plex/transcode:/backup/plex_server_transcode:ro
+            - /plex/media:/backup/plex_server_media:ro
+            - portainer_data:/backup/portainer_data:ro
+            - ./data:/backup/uptime_kuma_data:ro
+        restart: unless-stopped
+        secrets:
+            - volume_backup_nas_ip
+            - volume_backup_nas_user
+            - volume_backup_nas_pw
+        healthcheck:
+            test: "exit 0"
+            interval: 60s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+
+volumes:
+    portainer_data:
+        name: portainer_data

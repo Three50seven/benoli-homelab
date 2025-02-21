@@ -13,16 +13,16 @@ URL: https://192.168.1.103:8006
 	WWN: 5002538F543442F3
 	PSID: CM4Q7X088FH6GTMRUY9FG31V7FNWK3SN
 
-#Physical Machine info:
+# Physical Machine info:
 Product: MID TOWER PC
 MODEL: DELL Optiplex 755
 	
-#Create ZFS Pool with remaining diskspace:
-##See ...\Dropbox\Main\HomeServers\linux-notes\partition-storage-device-linux.md for notes on using the rest of the partition not used by the root file system of Proxmox
-##Run Command to view free space and disk usage stats in human readable format - note the "Type", you should see ZFS pools that can be imported
+# Create ZFS Pool with remaining diskspace:
+## See ...\Dropbox\Main\HomeServers\linux-notes\partition-storage-device-linux.md for notes on using the rest of the partition not used by the root file system of Proxmox
+## Run Command to view free space and disk usage stats in human readable format - note the "Type", you should see ZFS pools that can be imported
 df -Th
 
-#See ...\Dropbox\Main\HomeServers\linux-notes\zfs-file-system-notes.md FOR MORE ZFS POOL COMMANDS, SPECIFICALLY NOTES ABOUT IMPORTING POOL FROM PREV. SYSTEM IF THIS IS A REINSTALL OF PROXMOX:
+# See ...\Dropbox\Main\HomeServers\linux-notes\zfs-file-system-notes.md FOR MORE ZFS POOL COMMANDS, SPECIFICALLY NOTES ABOUT IMPORTING POOL FROM PREV. SYSTEM IF THIS IS A REINSTALL OF PROXMOX:
 zpool list
 OUTPUT SHOULD LOOK SOMETHING LIKE THIS:
 NAME      SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
@@ -31,11 +31,11 @@ rpool    63.5G  1.78G  61.7G        -         -     0%     2%  1.00x    ONLINE  
 zbarrel   928G   305G   623G        -         -     0%    32%  1.00x    ONLINE  -
 zkeg      400G  1.95M   400G        -         -     0%     0%  1.00x    ONLINE  -
 
-#Potentially remove the nag (popop warning) about licensing in Proxmox Web Manager:
+# Potentially remove the nag (popop warning) about licensing in Proxmox Web Manager:
 https://dannyda.com/2020/05/17/how-to-remove-you-do-not-have-a-valid-subscription-for-this-server-from-proxmox-virtual-environment-6-1-2-proxmox-ve-6-1-2-pve-6-1-2/
 
-#Update the APT (Advance Package Tool) Repositories in Proxmox Host:
-#Guide: https://benheater.com/bare-metal-proxmox-laptop/amp/
+# Update the APT (Advance Package Tool) Repositories in Proxmox Host:
+# Guide: https://benheater.com/bare-metal-proxmox-laptop/amp/
 	# Comment out the enterprise repositories - using Command Line:
 	sed '/^[^#]/ s/^/# /' -i /etc/apt/sources.list.d/pve-enterprise.list
 	sed '/^[^#]/ s/^/# /' -i /etc/apt/sources.list.d/ceph.list
@@ -53,15 +53,15 @@ https://dannyda.com/2020/05/17/how-to-remove-you-do-not-have-a-valid-subscriptio
 	--f apt is interrupted for some reason, packages that have been downloaded and unpacked may not have been fully configured, or installed.
 	--he --configure option causes dpkg to finish configuration of partially installed packages, and the -a indicates that rather than a specific package, all unpacked, but unconfigured packages should be processed.
 
-#Then run the following to clean and update:
+# Then run the following to clean and update:
 	apt clean && apt update
 	
-#Run upgrade to upgrade all packages to latest:
+# Run upgrade to upgrade all packages to latest:
 	#NOTE: You can use "apt --dry-run upgrade" for a dry-run before upgrading
 	#Reference: https://www.baeldung.com/linux/list-upgradable-packages
 	apt upgrade	
 
-#Install NFS (Network File System) for Linux Sharing
+# Install NFS (Network File System) for Linux Sharing
 apt install nfs-kernel-Server
 
 - export the zfs filesystem by adding the following line to /etc/exports
@@ -128,7 +128,7 @@ CLI: (e.g. [pct set 103 -mp0 /host/dir,mp=/container/mount/point] where 103 = co
 	
 --LEFT OFF HERE 7/16/2024
 	
-#Make sure zpool is listed as storage option for VMs and OSs:
+# Make sure zpool is listed as storage option for VMs and OSs:
 go to the Proxmox of host machine on local IP, them go to Datacenter > Storage > Add > ZFS > Choose the zpool you wanted to add.
 add mount point on fileserver (via proxmox web ui) - fileserver > Resources > Add
 to start out - choose 3072 (3TB) for "Disk size"
@@ -182,3 +182,21 @@ References: https://www.vinchin.com/vm-backup/proxmox-offsite-backup.html
 	By default additional mount points besides the Root Disk mount point are not included in backups. 
 	For volume mount points you can set the Backup option to include the mount point in the backup. 
 	Device and bind mounts are never backed up as their content is managed outside the Proxmox VE storage library.
+
+# Add nasbackup User (for backing up files to nas without root access)
+adduser nasbackup
+
+- Enter a password when prompted and verify by typing password again
+- Edit SSH config to allow user to connect:
+nano /etc/ssh/sshd_config
+
+# Add "newuser" to the "AllowUsers"
+- Add line under "Authentication" section in format (AllowUsers username1 username2 etc.)
+AllowUsers nasbackup
+- Create backup directories for docker containers (-p option will ensure parent directories are also created):
+mkdir -p /naspool/backups/benolilab-docker/container-volumes
+- Change owner and grant permissions to read/write for nasbackup user on backup directory:
+chown nasbackup -R /naspool/backups/benolilab-docker
+chmod -R u+rw /naspool/backups/benolilab-docker
+- Restart the SSH service
+systemctl restart sshd

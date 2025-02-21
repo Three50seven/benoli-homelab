@@ -202,14 +202,28 @@ on docker vm, you should see the usb device now:
 	WARNING: unhandled stream_type: 1B
 	---
 	You should now be able to setup plex with docker-compose file below.
-	
-#Setup Plex in Docker Container:
+
+# Setup Docker directory and Docker Compose
+mkdir /opt/benolilab-docker
+mkdir /opt/benolilab-docker/secrets
+- upload the secrets from secure location (each file is specified in the "secrets" top level section of the docker-compose)
+- upload docker-compose.yml to /opt/benolilab-docker
+- run docker compose up
+```
+cd /opt/benolilab-docker
+docker ps -a
+docker compose up -d
+```
+- The -d option in the docker compose up command stands for "detached mode." When you use this option, Docker Compose runs the containers in the background and returns control to your terminal. This allows you to continue using your terminal for other tasks while the containers run.
+
+
+# Setup Plex in Docker Container (PRE Full Docker-compose - mentioned above - see benolilab-docker):
 ref: https://www.rapidseedbox.com/blog/plex-on-docker
 - login to the docker vm and create the plex directories:
 mkdir /plex
 mkdir /plex/{database,transcode,media}
 mkdir /opt/plex
-- create docker compose file with nano editor:
+- create docker compose file with nano editor (OR USE THE docker-compose.yml file from this repo and follow the steps in setup-docker-directory-and-docker-compose):
 nano /opt/plex/docker-compose.yml
 - add contents of docker-compose:
 --NOTE: if you want to add a new volume (i.e. for library files), add it to the volumes list Below
@@ -227,21 +241,23 @@ services:
 	container_name: plex
 	image: linuxserver/plex
 	network_mode: host
+	ports:
+		- "32400:32400/tcp"
 	restart: unless-stopped
 	environment:
-	  - TZ=America/New_York
-	  - PLEX_CLAIM=<GET CLAIM FROM https://www.plex.tv/claim/>
-	  - PUID=1000
-	  - PGID=1000
+		- TZ=America/New_York
+		- PLEX_CLAIM=<GET CLAIM FROM https://www.plex.tv/claim/>
+		- PUID=1000
+		- PGID=1000
 	volumes:
-	  - /plex/database:/config
-	  - /plex/transcode:/transcode
-	  - /plex/media:/data
-	  - /mnt/naspool:/naspool
-	  - /mnt/sdb:/localmedia
+		- /plex/database:/config
+		- /plex/transcode:/transcode
+		- /plex/media:/data
+		- /mnt/naspool:/naspool
+		- /mnt/sdb:/localmedia
 	devices:
-	  - /dev/bus/usb:/dev/bus/usb	
-	  - /dev/dvb:/dev/dvb
+		- /dev/bus/usb:/dev/bus/usb	
+		- /dev/dvb:/dev/dvb
 ```
 =======================
 cd /opt/plex
@@ -250,7 +266,7 @@ docker compose up -d
 -view info about docker container (with -a shows all, even non-running containers):
 docker ps -a
 
-#Update Plex when needed (PRE WATCHTOWER):
+# Update Plex when needed (PRE WATCHTOWER):
 cd /opt/plex
 docker compose pull plex
 docker compose down 
@@ -371,12 +387,13 @@ services:
     image: containrrr/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+	restart: unless-stopped
     environment:
       WATCHTOWER_CLEANUP: true
       WATCHTOWER_DEBUG: true
       WATCHTOWER_ROLLING_RESTART: true
       WATCHTOWER_LABEL_ENABLE: true
-      WATCHTOWER_SCHEDULE: "10 * 9 * * 5"	  
+      WATCHTOWER_SCHEDULE: 0 0 9 * * 5
       WATCHTOWER_NOTIFICATION_REPORT: true
       WATCHTOWER_NOTIFICATION_URL: discord://token@channel
       WATCHTOWER_NOTIFICATION_TEMPLATE: |
