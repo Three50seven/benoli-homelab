@@ -13,7 +13,7 @@ secrets:
 services:
     portainer:
         container_name: "portainer"
-        image: "portainer/portainer-ce:2.27.0"
+        image: "portainer/portainer-ce:alpine"
         ports:
           - "9443:9443/tcp"
         restart: always
