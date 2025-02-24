@@ -14,6 +14,9 @@ services:
     portainer:
         container_name: "portainer"
         image: "portainer/portainer-ce:alpine"
+        networks:
+          server_net:
+            ipv4_address: 172.20.0.10
         ports:
           - "9443:9443/tcp"
         restart: always
@@ -28,6 +31,9 @@ services:
     watchtower:
         container_name: watchtower
         image: containrrr/watchtower
+        networks:
+          server_net:
+            ipv4_address: 172.20.0.11
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock
         restart: unless-stopped
@@ -72,6 +78,9 @@ services:
     uptime-kuma:
         container_name: uptime-kuma
         image: louislam/uptime-kuma:1
+        networks:
+          server_net:
+            ipv4_address: 172.20.0.12
         volumes:
             - ./data:/app/data
             - /var/run/docker.sock:/var/run/docker.sock
@@ -88,6 +97,9 @@ services:
     plex:
         container_name: plex
         image: linuxserver/plex
+        networks:
+          server_net:
+            ipv4_address: 172.20.0.13
         network_mode: host
         ports:
             - "32400:32400/tcp"
@@ -118,6 +130,9 @@ services:
     volumes_backup:
         container_name: "docker-volume-backup"
         image: offen/docker-volume-backup:latest
+        networks:
+          server_net:
+            ipv4_address: 172.20.0.14
         environment:
             BACKUP_FILENAME: backup-%Y-%m-%dT%H-%M-%S.tar.gz
             BACKUP_PRUNING_PREFIX: backup-
@@ -148,7 +163,17 @@ services:
             timeout: 5s
             retries: 3
             start_period: 10s
+    
 
 volumes:
     portainer_data:
         name: portainer_data
+
+networks:
+    server_net:
+        name: server_net
+        driver: bridge
+        ipam:
+            config:
+                - subnet: 172.20.0.0/16
+                - gateway: 172.20.0.1
