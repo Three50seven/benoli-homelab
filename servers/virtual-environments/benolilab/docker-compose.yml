@@ -100,7 +100,6 @@ services:
         networks:
           server_net:
             ipv4_address: 172.20.0.13
-        network_mode: host
         ports:
             - "32400:32400/tcp"
         restart: unless-stopped
@@ -152,6 +151,9 @@ services:
             - /plex/media:/backup/plex_server_media:ro
             - portainer_data:/backup/portainer_data:ro
             - ./data:/backup/uptime_kuma_data:ro
+            - nginx_proxy_config:/backup/nginx_proxy_config:ro
+            - nginx_proxy_data:/backup/nginx_proxy_data:ro
+            - nginx_proxy_letsencrypt:/backup/nginx_proxy_letsencrypt:ro
         restart: unless-stopped
         secrets:
             - volume_backup_nas_ip
@@ -163,12 +165,38 @@ services:
             timeout: 5s
             retries: 3
             start_period: 10s
-    
-
+    nginx_proxy:
+        container_name: "nginx_proxy"
+        environment:
+          - "DB_SQLITE_FILE=/config/database.sqlite"
+          - "DISABLE_IPV6=true"
+        image: "jc21/nginx-proxy-manager:latest"
+        networks:
+          server_net:
+            ipv4_address: 172.20.0.254
+        ports:
+           - '80:80'
+           - '443:443'
+           - '81:81'
+           - '853:853'
+        restart: "unless-stopped"
+        volumes:
+          - "nginx_proxy_config:/config"
+          - "nginx_proxy_letsencrypt:/etc/letsencrypt"
+          - "nginx_proxy_data:/data"
+        healthcheck:
+          test: ["CMD", "/bin/check-health"]
+          interval: 10s
+          timeout: 3s
 volumes:
     portainer_data:
         name: portainer_data
-
+    nginx_proxy_config:
+        name: nginx_proxy_config
+    nginx_proxy_letsencrypt:
+        name: nginx_proxy_letsencrypt
+    nginx_proxy_data:
+        name: nginx_proxy_data
 networks:
     server_net:
         name: server_net
