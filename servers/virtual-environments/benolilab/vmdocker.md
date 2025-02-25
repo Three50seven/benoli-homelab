@@ -455,3 +455,56 @@ services:
       - 3001:3001
     restart: unless-stopped
 ```
+
+# Configure SSH to work in docker-volume-backup
+```
+	# From vmdocker, SSH into the docker-volume-backup <name_or_id_of_container> container:
+	docker exec -it docker-volume-backup /bin/sh
+	
+	# Add SSH client:
+	apk add --no-cache openssh
+	
+	# check version:
+	ssh -V
+```
+
+# View/Configure routing on docker host to main home network:
+
+- Identify the Docker Bridge Network: First, find the Docker bridge network's gateway IP address. You can do this by inspecting the Docker network:
+```
+    docker network inspect server_net
+```
+- Look for the Gateway field in the output.
+- Add a Route on the Host Machine: Use the ip route add command to add a route on the host machine. This command will forward traffic from the Docker network to the target network (e.g., 192.168.x.x):
+```
+    ip route add 192.168.0.0/16 via <docker_gateway_ip>
+	# Replace <docker_gateway_ip> with the gateway IP address you found in the previous step.
+	# To remove, just change add to del:
+	ip route del 192.168.0.0/16 via <docker_gateway_ip>
+```
+- Verify the Route: Check that the route has been added correctly by running:
+```
+    ip route
+```
+- You should see a route entry for the 192.168.0.0/16 network via the Docker gateway IP.
+- Configure Firewall Rules (if necessary): Ensure that your firewall rules allow traffic between the Docker network and the target network. You might need to adjust iptables rules or your firewall configuration.
+- Once the routing is set up, you should be able to SSH from your Docker container to the device on the 192.168.x.x network:
+```
+ssh user@192.168.x.x
+```
+
+# Test SSH or Tracert (Network issues) From a Container:
+- To SSH into a Docker container, you typically use docker exec rather than traditional SSH. Here’s how you can do it:
+- Find the Container ID or Name: List all running containers to find the container ID or name.
+```
+	docker ps
+```
+- Execute a Shell Inside the Container: Use the docker exec command to start an interactive shell session inside the container. For example, to start a bash shell:
+```
+	docker exec -it <container_id_or_name> /bin/bash
+```
+- If the container uses a different shell (e.g., sh), adjust the command accordingly:
+```
+	docker exec -it <container_id_or_name> /bin/sh
+```
+- Access the Container: You will now be inside the container and can run commands as needed.
