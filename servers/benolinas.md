@@ -192,11 +192,19 @@ nano /etc/ssh/sshd_config
 
 # Add "newuser" to the "AllowUsers"
 - Add line under "Authentication" section in format (AllowUsers username1 username2 etc.)
-AllowUsers nasbackup
+```
+AllowUsers root nasbackup
+```
 - Create backup directories for docker containers (-p option will ensure parent directories are also created):
+```
 mkdir -p /naspool/backups/benolilab-docker/container-volumes
+```
 - Change owner and grant permissions to read/write for nasbackup user on backup directory:
+```
 chown nasbackup -R /naspool/backups/benolilab-docker
 chmod -R u+rw /naspool/backups/benolilab-docker
+```
 - Restart the SSH service
+```
 systemctl restart sshd
+```
