@@ -16,7 +16,7 @@ services:
         image: "portainer/portainer-ce:alpine"
         networks:
           server_net:
-            ipv4_address: 172.20.0.10
+            ipv4_address: 172.18.0.10
         ports:
           - "9443:9443/tcp"
         restart: always
@@ -33,7 +33,7 @@ services:
         image: containrrr/watchtower
         networks:
           server_net:
-            ipv4_address: 172.20.0.11
+            ipv4_address: 172.18.0.11
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock
         restart: unless-stopped
@@ -80,7 +80,7 @@ services:
         image: louislam/uptime-kuma:1
         networks:
           server_net:
-            ipv4_address: 172.20.0.12
+            ipv4_address: 172.18.0.12
         volumes:
             - ./data:/app/data
             - /var/run/docker.sock:/var/run/docker.sock
@@ -99,7 +99,7 @@ services:
         image: linuxserver/plex
         networks:
           server_net:
-            ipv4_address: 172.20.0.13
+            ipv4_address: 172.18.0.13
         ports:
             - "32400:32400/tcp"
         restart: unless-stopped
@@ -131,7 +131,7 @@ services:
         image: offen/docker-volume-backup:latest
         networks:
           server_net:
-            ipv4_address: 172.20.0.14
+            ipv4_address: 172.18.0.14
         environment:
             BACKUP_FILENAME: backup-%Y-%m-%dT%H-%M-%S.tar.gz
             BACKUP_PRUNING_PREFIX: backup-
@@ -173,7 +173,7 @@ services:
         image: "jc21/nginx-proxy-manager:latest"
         networks:
           server_net:
-            ipv4_address: 172.20.0.254
+            ipv4_address: 172.18.0.254
         ports:
            - '80:80'
            - '443:443'
@@ -203,5 +203,5 @@ networks:
         driver: bridge
         ipam:
             config:
-                - subnet: 172.20.0.0/16
-                - gateway: 172.20.0.1
+                - subnet: 172.18.0.0/16
+                  gateway: 172.18.0.1
