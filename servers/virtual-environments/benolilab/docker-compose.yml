@@ -28,6 +28,8 @@ services:
               interval: 1m30s
               timeout: 30s
               retries: 5
+        labels:
+            - com.centurylinklabs.watchtower.enable=true 
     watchtower:
         container_name: watchtower
         image: containrrr/watchtower
@@ -94,6 +96,8 @@ services:
             timeout: 15s
             retries: 3
             start_period: 1m
+        labels:
+            - com.centurylinklabs.watchtower.enable=true 
     plex:
         container_name: plex
         image: linuxserver/plex
@@ -126,6 +130,8 @@ services:
               start_period: 1m
         secrets:
             - plex_claim
+        labels:
+            - com.centurylinklabs.watchtower.enable=true 
     volumes_backup:
         container_name: "docker-volume-backup"
         image: offen/docker-volume-backup:latest
@@ -159,6 +165,8 @@ services:
             - volume_backup_nas_ip
             - volume_backup_nas_user
             - volume_backup_nas_pw
+        labels:
+            - com.centurylinklabs.watchtower.enable=true 
         healthcheck:
             test: "exit 0"
             interval: 60s
@@ -184,6 +192,8 @@ services:
           - "nginx_proxy_config:/config"
           - "nginx_proxy_letsencrypt:/etc/letsencrypt"
           - "nginx_proxy_data:/data"
+        labels:
+            - com.centurylinklabs.watchtower.enable=true 
         healthcheck:
           test: ["CMD", "/bin/check-health"]
           interval: 10s
