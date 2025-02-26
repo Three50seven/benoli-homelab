@@ -207,12 +207,20 @@ on docker vm, you should see the usb device now:
 mkdir /opt/benolilab-docker
 mkdir /opt/benolilab-docker/secrets
 - upload the secrets from secure location (each file is specified in the "secrets" top level section of the docker-compose)
+- NOTE: for SSH_HOST_NAME on volume_backups service, use format: <user-name>@<ip-address-or-host-name>:<port> (e.g. user@10.0.0.53:22)
+- After updating a secret, you will need to restart the service (see below) to get the new value
 - upload docker-compose.yml to /opt/benolilab-docker
 - run docker compose up
 ```
-cd /opt/benolilab-docker
-docker ps -a
-docker compose up -d
+	cd /opt/benolilab-docker
+	docker ps -a
+	docker compose up -d
+
+# To restart a service (by service name, not container name) - e.g. needed after updating a secret value
+# List docker compose services and ports etc.:
+	docker compose ps 
+# Restart the service (to get new secret etc.)
+	docker compose restart <service_name>
 ```
 - The -d option in the docker compose up command stands for "detached mode." When you use this option, Docker Compose runs the containers in the background and returns control to your terminal. This allows you to continue using your terminal for other tasks while the containers run.
 
