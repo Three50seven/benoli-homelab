@@ -465,6 +465,7 @@ services:
 ```
 
 # Configure SSH to work in docker-volume-backup
+- NOTE: This may not be needed, after trouble-shooting issue with format of SSH HOST (Notes added above - search "secrets")
 ```
 	# From vmdocker, SSH into the docker-volume-backup <name_or_id_of_container> container:
 	docker exec -it docker-volume-backup /bin/sh
