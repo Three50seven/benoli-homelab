@@ -221,6 +221,13 @@ mkdir /opt/benolilab-docker/secrets
 	docker compose ps 
 # Restart the service (to get new secret etc.)
 	docker compose restart <service_name>
+
+# Custom filter process status of docker or docker compose:
+	docker ps --format "table {{.Image}}\t{{.Names}}\t{{.Status}}"
+	docker compose ps --format "table {{.Image}}\t{{.Name}}\t{{.Status}}\t{{.Service}}"
+
+# Monitor Memory usage and process IDs of Containers (--no-stream option takes snapshot - leave this off to view real-time):
+	docker stats --no-stream
 ```
 - The -d option in the docker compose up command stands for "detached mode." When you use this option, Docker Compose runs the containers in the background and returns control to your terminal. This allows you to continue using your terminal for other tasks while the containers run.
 
