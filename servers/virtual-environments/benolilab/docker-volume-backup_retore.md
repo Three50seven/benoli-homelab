@@ -47,6 +47,8 @@ docker run -d --name temp_restore_container \
 -v nginx_proxy_config:/backup_restore/nginx_proxy_config \
 -v nginx_proxy_data:/backup_restore/nginx_proxy_data \
 -v nginx_proxy_letsencrypt:/backup_restore/nginx_proxy_letsencrypt \
+-v adguard_work:/backup_restore/adguard_work \
+-v adguard_conf:/backup_restore/adguard_conf \
 alpine
 
 docker cp /tmp/backup/plex_server_config/. temp_restore_container:/backup_restore/plex_server_config
@@ -57,6 +59,8 @@ docker cp /tmp/backup/uptime_kuma_data/. temp_restore_container:/backup_restore/
 docker cp /tmp/backup/nginx_proxy_config/. temp_restore_container:/backup_restore/nginx_proxy_config
 docker cp /tmp/backup/nginx_proxy_data/. temp_restore_container:/backup_restore/nginx_proxy_data
 docker cp /tmp/backup/nginx_proxy_letsencrypt/. temp_restore_container:/backup_restore/nginx_proxy_letsencrypt
+docker cp /tmp/backup/adguard_work/. temp_restore_container:/backup_restore/adguard_work
+docker cp /tmp/backup/adguard_conf/. temp_restore_container:/backup_restore/adguard_conf
 
 docker stop temp_restore_container
 docker rm temp_restore_container

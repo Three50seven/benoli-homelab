@@ -160,6 +160,8 @@ services:
             - nginx_proxy_config:/backup/nginx_proxy_config:ro
             - nginx_proxy_data:/backup/nginx_proxy_data:ro
             - nginx_proxy_letsencrypt:/backup/nginx_proxy_letsencrypt:ro
+            - adguard_work:/backup/adguard_work:ro
+            - adguard_conf:/backup/adguard_conf:ro
         restart: unless-stopped
         secrets:
             - volume_backup_nas_ip
@@ -198,6 +200,32 @@ services:
           test: ["CMD", "/bin/check-health"]
           interval: 10s
           timeout: 3s
+    adguardhome:
+        container_name: adguardhome
+        image: adguard/adguardhome
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.253
+        volumes:
+          - adguard_work:/opt/adguardhome/work
+          - adguard_conf:/opt/adguardhome/conf
+        ports:
+          - "53:53/tcp"
+          - "53:53/udp"
+          - "67:67/udp"
+          - "68:68/udp"
+          - "80:80/tcp"
+          - "443:443/tcp"
+          - "853:853/tcp"
+          - "3000:3000/tcp"
+        restart: unless-stopped
+        labels:
+            - com.centurylinklabs.watchtower.enable=true
+        healthcheck:
+            test: ["CMD-SHELL", "wget --spider -q http://localhost:3000 || exit 1"]
+            interval: 10s
+            timeout: 30s
+            retries: 3
 volumes:
     portainer_data:
         name: portainer_data
@@ -207,6 +235,10 @@ volumes:
         name: nginx_proxy_letsencrypt
     nginx_proxy_data:
         name: nginx_proxy_data
+    adguard_work:
+        name: adguard_work
+    adguard_conf:
+        name: adguard_conf
 networks:
     server_net:
         name: server_net
