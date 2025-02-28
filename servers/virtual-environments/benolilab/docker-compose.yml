@@ -4,8 +4,6 @@ secrets:
         file: ./secrets/.plex_claim
     watchtower_discord_hook:
         file: ./secrets/.watchtower_discord_hook
-    volume_backup_nas_ip:
-        file: ./secrets/.volume_backup_nas_ip
     volume_backup_nas_user:
         file: ./secrets/.volume_backup_nas_user
     volume_backup_nas_pw:
@@ -142,11 +140,11 @@ services:
             BACKUP_FILENAME: backup-%Y-%m-%dT%H-%M-%S.tar.gz
             BACKUP_PRUNING_PREFIX: backup-
             BACKUP_RETENTION_DAYS: 5
-            BACKUP_CRON_EXPRESSION: 0 10 * * *
+            BACKUP_CRON_EXPRESSION: 0 3 * * *
             SSH_HOST_NAME: ${NAS_IP_ADDRESS}
             SSH_PORT: 22
-            SSH_USER: /run/secrets/volume_backup_nas_user
-            SSH_PASSWORD: /run/secrets/volume_backup_nas_pw
+            SSH_USER_FILE: /run/secrets/volume_backup_nas_user
+            SSH_PASSWORD_FILE: /run/secrets/volume_backup_nas_pw
             SSH_REMOTE_PATH: /naspool/backups/benolilab-docker/container-volumes
         volumes:
             - /etc/timezone:/etc/timezone:ro
@@ -164,7 +162,6 @@ services:
             - adguard_conf:/backup/adguard_conf:ro
         restart: unless-stopped
         secrets:
-            - volume_backup_nas_ip
             - volume_backup_nas_user
             - volume_backup_nas_pw
         labels:
@@ -176,7 +173,7 @@ services:
             retries: 3
             start_period: 10s
     nginx_proxy:
-        container_name: "nginx_proxy"
+        container_name: "nginx-proxy"
         environment:
           - "DB_SQLITE_FILE=/config/database.sqlite"
           - "DISABLE_IPV6=true"

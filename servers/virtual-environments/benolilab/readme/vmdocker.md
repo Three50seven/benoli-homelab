@@ -208,6 +208,7 @@ on docker vm, you should see the usb device now:
 	mkdir /opt/benolilab-docker
 	mkdir /opt/benolilab-docker/secrets
 ```
+- see ssh-generate-keys.md to generate .ssh_private_key for volume backups
 - upload the secrets from secure location (each file is specified in the "secrets" top level section of the docker-compose)
 - environment variables for .env file:
 ```	
