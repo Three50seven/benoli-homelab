@@ -101,116 +101,15 @@ Client: Docker Engine - Community
   compose: Docker Compose (Docker Inc.)
     Version:  v2.29.7
     Path:     /usr/libexec/docker/cli-plugins/docker-compose
-	
-# Mount the NAS server directory and localmedia directory for library files:
-https://support.plex.tv/articles/201122318-mounting-network-resources/
--install cifs-utils:
-	apt install cifs-utils
--install nfs-common:
-	apt install nfs-common
--make mount directories:
-	mkdir /mnt/naspool
-	mkdir /mnt/sdb
---NOTE: CHOOSE EITHER CIFS OR NFS:
--mount NAS directory as CIFS (SMB):
-	mount -t cifs //192.168.1.103/naspool /mnt/naspool -o rw,user=krimmhouse
--mount NAS directory as NFS:
-	mount -t nfs 192.168.1.103:/naspool/share /mnt/naspool
--create partition on sdb in docker server:
-	fdisk -l (list partitions)
-	fdisk /dev/sdb (start fdisk on target disk)
-	n (for new partition)
-	-accept all defaults by just hitting enterprise
-	w - write the new partition if everything looks correct
-	lsblk - to show all disks and partitions (should now see sdb1 partition)
-	- create an ext4 file-system (WARNING - THIS WILL ERASE ALL CONTENT ON THE DISK):
-	mkfs.ext4 /dev/sdb1
-	- finally mount the new ext4 disk partition:
-	mount /dev/sdb1 /mnt/sdb	
 
-# Edit fstab to auto-mount at boot:
---copy fstab file to backup directory (after making a backups directory, if it doesn't exist, update date in backup as needed)
-	mkdir /backups
-	cp  /etc/fstab   /backups/fstab_bak_20241204
-<!--NO LONGER NEEDED FOR NFS DRIVE: 
-	create credentials file for naspool:
-	nano /etc/naspoolcredentials.txt 
-	username=krimmhouse
-	password=<PW FOR USER>
-	CTRL+X, y to save/write new file-->
---list uuid for each drive:
-	ls -al /dev/disk/by-uuid/
---edit fstab file:
-	nano /etc/fstab
---add the lines:
-	# local drive sdb1
-	UUID=cbd4143f-b99b-4a77-93c8-714ea3d25325       /mnt/sdb        ext4    defaults        0       0
-	# naspool (network)
-	192.168.1.103:/naspool/share /mnt/naspool nfs defaults 0 0
-	<!--OR, if you're using CIFS (note, you'll need the credentials file created - see above)
-	//192.168.1.43/naspool  /mnt/naspool    cifs    iocharset=utf8,rw,credentials=/etc/naspoolcredentials.txt  0  0
-	-->
-	CTRL+X, y to save/write new file
---test fstab - check the last line for errors):
-	findmnt --verify
-	NOTE: Ignored udf,iso9660
---if everything looks okay, reload the mount fstab:
-	systemctl daemon-reload
-
-# Add TV Tuner device for plex container to use:
---To pass a USB device from Proxmox to a virtual machine (VM), 
-	navigate to the VM's settings within the Proxmox web interface, go to the "Hardware" section, 
-	and select "Add > USB Device"; then choose the specific USB device you want to passthrough by 
-	either selecting it using its Vendor/Device ID or specifying the physical USB port it's 
-	connected to on the Proxmox host.
-device should be named something like: Hauppauge 955D
-on docker vm, you should see the usb device now:
-	lsusb
---install the following packages:
-	apt update
-	apt-get install wget bzip2 build-essential libncurses5-dev	
-	apt-get install software-properties-common
-	apt install python3-launchpadlib
-	apt update
-	nano /etc/apt/sources.list
-	--add repo line manually (note jammy is the closest version of ubuntu that matches to debian 12 - you may need to check the site for newer versions if you have a newer OS install):
-	--source: https://launchpad.net/~b-rad/+archive/ubuntu/kernel+mediatree+hauppauge
-	--source for ubuntu debian matchup: https://askubuntu.com/questions/445487/what-debian-version-are-the-different-ubuntu-versions-based-on
-	-- reference: https://forums.plex.tv/t/cannot-connect-usb-tuner-wih-the-official-plex-docker-image/228823
-	deb [trusted=yes] https://ppa.launchpadcontent.net/b-rad/kernel+mediatree+hauppauge/ubuntu jammy main 
-	deb-src [trusted=yes] https://ppa.launchpadcontent.net/b-rad/kernel+mediatree+hauppauge/ubuntu jammy main 	
-	apt-get install linux-mediatree
-	--firmware install if needed (Most North American TV Tuners DO NOT NEED THIS): apt-get install linux-firmware-hauppauge 
-	--restart the vmdocker server via proxmox or ssh command (reboot)
-	--install wscan for channel scanning:
-	apt install w-scan -y
-	--make tvtuner directory:
-	mkdir /opt/tvtuner
-	cd /opt/tvtuner
-	--scan for ATSC channels in the United States
-	w_scan -fa -c US > channels.conf
-	--should see results e.g. ...
-	473000: 8VSB(time: 00:51.098)         signal ok:        8VSB     f=473000 kHz (0:0:0)
-	479000: 8VSB(time: 00:51.938)         signal ok:        8VSB     f=479000 kHz (0:0:0)
-	485000: 8VSB(time: 00:52.778)
-	...	
-	803000: 8VSB(time: 03:40.331)
-	tune to: 8VSB     f=473000 kHz (0:0:0) (time: 03:43.431)
-	service is running. Channel number: 32:1. Name: 'WLKY-HD'
-	service is running. Channel number: 32:2. Name: 'ME TV'
-	service is running. Channel number: 32:4. Name: 'STORY'
-	WARNING: unhandled stream_type: 1B
-	---
-	You should now be able to setup plex with docker-compose file below.
-
-# Setup Docker directory and Docker Compose
+# Setup Docker directory and Docker Compose (Preferred)
 ```
 	mkdir /opt/benolilab-docker
 	mkdir /opt/benolilab-docker/secrets
 ```
-- see ssh-generate-keys.md to generate .ssh_private_key for volume backups
 - upload the secrets from secure location (each file is specified in the "secrets" top level section of the docker-compose)
 - environment variables for .env file:
+- NOTE: Environment variables are exposed in the logs, so it is recommended to use docker secrets for passwords and other variables you do not want exposed in plain text in the logs
 ```	
 	NAS_IP_ADDRESS=<nas_ip_or_host_name>
 ```
@@ -219,6 +118,7 @@ on docker vm, you should see the usb device now:
 - upload docker-compose.yml to /opt/benolilab-docker
 - run docker compose up -d (detached option), note: without -d option, containers will run in foreground and show logs in terminal until stoped (w/ CTRL+C)
 - NOTE: The -d option in the docker compose up command stands for "detached mode." When you use this option, Docker Compose runs the containers in the background and returns control to your terminal. This allows you to continue using your terminal for other tasks while the containers run.
+- Add the --build flag after "up" like so in order to rebuild a container with new secrets or ext. files: docker compose up --build -d
 ```
 	cd /opt/benolilab-docker
 	docker ps -a
@@ -226,272 +126,51 @@ on docker vm, you should see the usb device now:
 ```
 
 # To restart a service (by service name, not container name) - e.g. needed after updating a secret value
-# List docker compose services and ports etc.:
+- List docker compose services and ports etc.:
+```
 	docker compose ps 
-# Restart the service (to get new secret etc.)
+```
+- Restart the service (to get new secret etc.)
+```
 	docker compose restart <service_name>
+```
 
 # Custom filter process status of docker or docker compose:
+```
 	docker ps --format "table {{.Image}}\t{{.Names}}\t{{.Status}}"
 	docker compose ps --format "table {{.Image}}\t{{.Name}}\t{{.Status}}\t{{.Service}}"
+```
 
 # Monitor Memory usage and process IDs of Containers (--no-stream option takes snapshot - leave this off to view real-time):
 ```
 	docker stats --no-stream
 ```
 
-
-# Setup Plex in Docker Container (PRE Full Docker-compose - mentioned above - see benolilab-docker):
-ref: https://www.rapidseedbox.com/blog/plex-on-docker
-- login to the docker vm and create the plex directories:
-mkdir /plex
-mkdir /plex/{database,transcode,media}
-mkdir /opt/plex
-- create docker compose file with nano editor (OR USE THE docker-compose.yml file from this repo and follow the steps in setup-docker-directory-and-docker-compose):
-nano /opt/plex/docker-compose.yml
-- add contents of docker-compose:
---NOTE: if you want to add a new volume (i.e. for library files), add it to the volumes list Below
-	- left of the : is the actual path and to the right is the path Plex will see.  
-	- map the USB bus and dev/dvb directories so that the TVTuner can be used by the container from the host
-	- add write permissions to allow plex to write to media directory for dvr recordings
-		stat /mnt/naspool/Plex/library
-		- use command above to confirm that localadmin is UID 1000 and Gid 1000 before adding to below record
-		- Verify Permissions: Check that the permissions are correctly set by listing the directory contents:
-		ls -l /mnt/naspool/Plex/library
-=======================
-```
-services:
-  plex:
-	container_name: plex
-	image: linuxserver/plex
-	network_mode: host
-	ports:
-		- "32400:32400/tcp"
-	restart: unless-stopped
-	environment:
-		- TZ=America/New_York
-		- PLEX_CLAIM=<GET CLAIM FROM https://www.plex.tv/claim/>
-		- PUID=1000
-		- PGID=1000
-	volumes:
-		- /plex/database:/config
-		- /plex/transcode:/transcode
-		- /plex/media:/data
-		- /mnt/naspool:/naspool
-		- /mnt/sdb:/localmedia
-	devices:
-		- /dev/bus/usb:/dev/bus/usb	
-		- /dev/dvb:/dev/dvb
-```
-=======================
-cd /opt/plex
--deploy container as detached:
-docker compose up -d
--view info about docker container (with -a shows all, even non-running containers):
-docker ps -a
-
-# Update Plex when needed (PRE WATCHTOWER):
-cd /opt/plex
-docker compose pull plex
-docker compose down 
-docker compose up -d
---when creating a new container, run with restart unless-stopped flag to restart on reboot
-docker run -d --restart unless-stopped <image_name>
---for an existing container, run:
-docker update --restart unless-stopped <container_name_or_id>
-- remove old images (optional):
-docker image prune
-
-# Connect to Plex server via browser (on machine that is on the same local network):
-http://192.168.1.63:32400/
-
-# Add TV Tuner and do a channel scan:
-Go to Settings > Manage > Live TV & DVR
---The USB device should now show - run a scan of channels and select "Local Broadcast Listings" as the guide info source
---Plex should then show you Live TV channels it found
-
-# Migrate Media data as needed:
-See benolinas-migrate-data.md for details
-
-# Add plex library directories via settings to view media
-Go to Settings > Manage > Libraries and add libraries as needed
-You should see the NAS drive and local drive as added in the volumes within the docker-compose file
-
 # Trouble-shooting memory issues - out of memory (OOM)
 - set minumum memory to 16 GB on VM
 - backup and modify sysctl.conf
-mkdir /backups
-	<!--NOTE: THIS DID NOT WORK WELL AND STOPPED CONNECTIONS TO PROXMOX
-	cp /etc/sysctl.conf /backups/sysctl.conf_bak_20241211
-	nano /etc/sysctl.conf
-	- add line to sysctl and save:
-	vm.overcommit_memory=2
-	- apply changes:
-	sysctl -p 
+- it seemed there wasn't enough memory for zfs to perform maintenance and it was killing the docker vm, so adjusted memory settings on VM to fix this
+```
+	mkdir /backups
+		<!--NOTE: THIS DID NOT WORK WELL AND STOPPED CONNECTIONS TO PROXMOX
+		cp /etc/sysctl.conf /backups/sysctl.conf_bak_20241211
+		nano /etc/sysctl.conf
+		- add line to sysctl and save:
+		vm.overcommit_memory=2
+		- apply changes:
+		sysctl -p 
 
-	reverted changes
-	-->
-cp /etc/modprobe.d/zfs.conf /backups/zfs.conf_bak_20241211
-nano /etc/modprobe.d/zfs.conf
+		reverted changes
+		-->
+	cp /etc/modprobe.d/zfs.conf /backups/zfs.conf_bak_20241211
+	nano /etc/modprobe.d/zfs.conf
+```
 --change arc max from default of 3 GB to 8 GB: 
 	--e.g. change: options zfs zfs_arc_max=3357540352 
 	--to: options zfs zfs_arc_max=8589934592
 --save file and apply changes:
 update-initramfs -u
 reboot
-
-
-# Setup Portainer (GUI Docker Mgmt)
-ref: https://docs.portainer.io/start/install-ce/server/docker/linux
-docker volume create portainer_data
-docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:2.21.5
-login via web browser:
-https://localhost:9443
-Replace localhost with the relevant IP address or FQDN if needed, and adjust the port if you changed it earlier.
-
-```
-portainer:
-    container_name: "portainer"
-    image: "portainer/portainer-ce:2.21.5"
-    ports:
-      - "9443:9443/tcp"
-    restart: "always"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "portainer_data:/data"
-    healthcheck:
-      test: "wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost:9443 || exit 1"
-      interval: 60s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-```
-
--Updating Portainer
-
--Backup Your Data: Before updating, it's a good idea to back up your Portainer data. This ensures you can restore your setup if anything goes wrong.
-	Backing up your Portainer data before updating is a crucial step to ensure you can restore your setup if anything goes wrong. Here’s how you can do it:
-
-	Create a Backup Volume: First, create a backup volume to store your Portainer data.
-
-	docker volume create portainer_data_backup
-	Copy Data to the Backup Volume: Use a temporary container to copy the data from your existing Portainer volume to the backup volume.
-
-	docker run --rm --volumes-from portainer -v portainer_data_backup:/backup busybox cp -a /data /backup
-	Verify the Backup: Ensure that the data has been copied correctly by inspecting the backup volume.
-
-	docker run --rm -v portainer_data_backup:/backup busybox ls /backup
-	Store the Backup Safely: Optionally, you can export the backup volume to a tar file for easier storage and transfer.
-
-	docker run --rm -v portainer_data_backup:/backup -v $(pwd):/host busybox tar cvf /host/portainer_data_backup.tar /backup
-
--Stop and Remove the Existing Portainer Container:
-
-docker stop portainer
-docker rm portainer
-Pull the Latest Portainer Image:
-
-docker pull portainer/portainer-ce:latest
-Start the Updated Portainer Container:
-
-docker run -d -p 8000:8000 -p 9443:9443 --name=portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
-Verify the Update: Log in to your Portainer instance and verify that the update was successful.
-
-
-# Setup watchtower - to auto update docker images
-ref: https://youtu.be/7PJ5jT4JkP4
-src: https://containrrr.dev/watchtower/
-In Portainer Web GUI, go to add new stack
-Paste in the docker compose yml:
-```
-version: "3"
-services:
-  watchtower:
-	container_name: watchtower
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-	restart: unless-stopped
-    environment:
-      WATCHTOWER_CLEANUP: true
-      WATCHTOWER_DEBUG: true
-      WATCHTOWER_ROLLING_RESTART: true
-      WATCHTOWER_LABEL_ENABLE: true
-      WATCHTOWER_SCHEDULE: 0 0 9 * * 5
-      WATCHTOWER_NOTIFICATION_REPORT: true
-      WATCHTOWER_NOTIFICATION_URL: discord://token@channel
-      WATCHTOWER_NOTIFICATION_TEMPLATE: |
-        {{- if .Report -}}
-          {{- with .Report -}}
-        {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-          {{- range .Updated}}
-        - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
-          {{- end -}}
-          {{- range .Fresh}}
-        - {{.Name}} ({{.ImageName}}): {{.State}}
-          {{- end -}}
-          {{- range .Skipped}}
-        - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-          {{- end -}}
-          {{- range .Failed}}
-        - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-          {{- end -}}
-          {{- end -}}
-        {{- else -}}
-          {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
-        {{- end -}}
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
-```
-Here's the breakdown of the cron fields for WATCHTOWER_SCHEDULE_:
-
-A cron expression represents a set of times, using 6 space-separated fields.
-
-Field name   | Mandatory? | Allowed values  | Allowed special characters
-----------   | ---------- | --------------  | --------------------------
-Seconds      | Yes        | 0-59            | * / , -
-Minutes      | Yes        | 0-59            | * / , -
-Hours        | Yes        | 0-23            | * / , -
-Day of month | Yes        | 1-31            | * / , - ?
-Month        | Yes        | 1-12 or JAN-DEC | * / , -
-Day of week  | Yes        | 0-6 or SUN-SAT  | * / , - ?
-
-With WATCHTOWER_LABEL_ENABLE set to true, you need to go to each docker container and add the label:
-com.centurylinklabs.watchtower.enable=true 
-(NOTE: This can be done via portainer GUI once installed)
-
--Setup notifications:
---Format for shoutrrr service
-https://discord.com/api/webhooks/webhookid/token
-discord://token@webhookid
-
-# Setup uptime-kuma - Notifications for containers
-```
-services:
-  uptime-kuma:
-	container_name: uptime-kuma
-    image: louislam/uptime-kuma:1
-    volumes:
-      - ./data:/app/data
-	  - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      # <Host Port>:<Container Port>
-      - 3001:3001
-    restart: unless-stopped
-```
-
-# Configure SSH to work in docker-volume-backup
-- NOTE: This may not be needed, after trouble-shooting issue with format of SSH HOST (Notes added above - search "secrets")
-```
-	# From vmdocker, SSH into the docker-volume-backup <name_or_id_of_container> container:
-	docker exec -it docker-volume-backup /bin/sh
-	
-	# Add SSH client:
-	apk add --no-cache openssh
-	
-	# check version:
-	ssh -V
-```
 
 # View/Configure routing on docker host to main home network:
 
@@ -533,88 +212,3 @@ ssh user@192.168.x.x
 	docker exec -it <container_id_or_name> /bin/sh
 ```
 - Access the Container: You will now be inside the container and can run commands as needed.
-
-# Convert docker host file to volume (using uptime_kuma and plex as examples):
-To convert a Docker host file or directory (e.g., ./data) to a volume that you can mount into an already running container (e.g., uptime_kuma_data), you can't directly modify the volume of a running container, but you can follow these steps:
-
-Create a Docker Volume: First, create the Docker volume that you want to map (in this case, uptime_kuma_data).
-```
-	# Uptime-Kuma:
-	docker volume create uptime_kuma_data
-
-	# Plex:
-	docker volume create plex_server_config
-	docker volume create plex_server_transcode
-	docker volume create plex_server_media
-```
-Copy Data from Host to Volume: Use a temporary container to copy the data from the host (./data) into the volume.
-```
-	# Uptime-Kuma:
-	docker run --rm -v $(pwd)/data:/data -v uptime_kuma_data:/volume busybox sh -c "cp -r /data/. /volume/"
-
-	# Plex: 
-	docker run --rm -v /plex/database:/plex/database -v plex_server_config:/volume busybox sh -c "cp -r /plex/database/. /volume/"
-	docker run --rm -v /plex/transcode:/plex/transcode -v plex_server_transcode:/volume busybox sh -c "cp -r /plex/transcode/. /volume/"
-	docker run --rm -v /plex/media:/plex/media -v plex_server_media:/volume busybox sh -c "cp -r /plex/media/. /volume/"
-```
-This will copy everything from ./data on the host to the uptime_kuma_data volume.
-
-Stop the Running Container: Stop the container (uptime_kuma_container) that you want to apply the volume to.
-```
-	docker stop uptime-kuma
-	docker stop plex
-```
-Update the Docker Container in the docker-compose file with the New Volume, don't forget to add the volume to the list of volumes
-
-Re-run the compose command:
-NOTE: You will get a warning unless you add external: true to each of the new volumes - this tells docker compose not to overwrite the volume or try to re-create it
-- to avoid having the "external" flag, see "Copy docker volume and restore steps" below
-```
-	docker compose up -d
-```
-
-By following these steps, the host's ./data will be copied to the uptime_kuma_data volume, and the volume will be mounted in the container. You’ll have successfully migrated the data from the host to the Docker volume.
-You can then clean-up the directory like so:
-Use the find command on the host to see if there are any other remnants of the files you copied to the new volumes:
-```
-	find / -name "kuma.db" 2>/dev/null  # Find both
-	find / -name "plex" 2>/dev/null  # Find both files and directories
-```
-!!!WARNING - THIS IS IRREVERSIBLE AND WILL DELETE EVERYTHING INSIDE THE DIRECTORIES:
-- a safter way would be through FileZilla or another file explorer/editor
-```
-	rm -rf /data
-
-```
-
-# Manually Copy docker volume and restore steps (so that docker-compose takes full ownership and you don't get the "volume already exists" warning)
-Remove the External Volume (If Data Persistence Is Needed, Back It Up) If you need to keep the data, you should back it up first:
-
-```
-docker run --rm -v plex_server_config:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /data/. /backup/plex_server_config/" && \
-docker run --rm -v plex_server_media:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /data/. /backup/plex_server_media/" && \
-docker run --rm -v plex_server_transcode:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /data/. /backup/plex_server_transcode/" && \
-docker run --rm -v uptime_kuma_data:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /data/. /backup/uptime_kuma_data/" && \
-docker run --rm -v portainer_data:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /data/. /backup/portainer_data/"
-
-```
-Then remove the external volume:
-```
-	docker volume rm plex_server_config plex_server_media plex_server_transcode uptime_kuma_data portainer_data
-```
-Modify docker-compose.yml to Define the Volume Without external: true Update your docker-compose.yml to define the volume under volumes: without marking it as external:
-
-Recreate the Volume Using Docker Compose Run the following command to let Docker Compose create and take ownership of the volume:
-```
-	docker compose up -d
-```
-
-(Optional) Restore Data if You Backed It Up If you previously backed up the data, restore it to the new volume:
-NOTE: Had to run docker compose down in order to recreate the server_net network again too. otherwise you may get an error that the network doesn't exist
-```
-docker run --rm -v plex_server_config:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /backup/plex_server_config/. /data/" && \
-docker run --rm -v plex_server_media:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /backup/plex_server_media/. /data/" && \
-docker run --rm -v plex_server_transcode:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /backup/plex_server_transcode/. /data/" && \
-docker run --rm -v uptime_kuma_data:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /backup/uptime_kuma_data/. /data/" && \
-docker run --rm -v portainer_data:/data -v $(pwd)/backup:/backup busybox sh -c "cp -r /backup/portainer_data/. /data/"
-```
