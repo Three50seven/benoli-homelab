@@ -39,11 +39,12 @@ Restart the container(s) that are using the volume.
 # Specifics for vmdocker Host:
 ```
 docker run -d --name temp_restore_container \
--v /plex/database:/backup_restore/plex_server_config \
--v /plex/transcode:/backup_restore/plex_server_transcode \
--v /plex/media:/backup_restore/plex_server_media \
+
+-v plex_server_config:/backup_restore/plex_server_config \
+-v plex_server_transcode:/backup_restore/plex_server_transcode \
+-v plex_server_media:/backup_restore/plex_server_media \
 -v portainer_data:/backup_restore/portainer_data \
--v ./data:/backup_retore/uptime_kuma_data \
+-v uptime_kuma_data:/backup_retore/uptime_kuma_data \
 -v nginx_proxy_config:/backup_restore/nginx_proxy_config \
 -v nginx_proxy_data:/backup_restore/nginx_proxy_data \
 -v nginx_proxy_letsencrypt:/backup_restore/nginx_proxy_letsencrypt \

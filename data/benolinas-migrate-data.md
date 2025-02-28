@@ -1,7 +1,7 @@
 2024.12.06
 Notes on migrating data to NAS:
 
-#Plug in external hd to source and copy over data
+# Plug in external hd to source and copy over data
 	--Windows Powershell to copy over old media files (prior to hosting plex in docker container)
 	ROBOCOPY "I:\Plex\Library" "H:\nasplexlibrary\Plex\Library" /z /mir /xj /mt /eta /tee
 	ROBOCOPY "C:\Users\Three50seven\Music\iTunes\iTunes Music" "H:\nasplexlibrary\Plex\Library\Music" /z /mir /xj /mt /eta /tee
@@ -10,13 +10,13 @@ Notes on migrating data to NAS:
 	--also deleted "Music" from "H:\NAS_Backup\Plex\Library"
 	ROBOCOPY "H:\NAS_Backup\Plex\Library" "H:\nasplexlibrary\Plex\Library" /z /e /xj /mt /eta /tee /xo
 
-#Passthrough external hd to destination VM on Proxmox (NAS)
+# Passthrough external hd to destination VM on Proxmox (NAS)
 	--Plug in external hd to the NAS machine:
 	```bash
 	lsblk to view new drive
 	```	
 <!--ONLY NEEDED if passing the disk to a VM or container:
-#Use virtio for faster performance on disk for VM:
+# Use virtio for faster performance on disk for VM:
 	ref: https://www.youtube.com/watch?v=wGhSJ-G9jQg
 	--this will use the para virtualized disk, which is ~20-25% faster than sd disk
 	SSH to proxmox nas host (benolinas)
@@ -40,16 +40,16 @@ Notes on migrating data to NAS:
 	--you should now see a vda disk in the VM
 -->
 
-#Mount the drive - 
+# Mount the drive - 
 --Note, use /dev/vda if doing para virtual disk, or /dev/sdg1 (assuming this is where the usb dev is located) if using standard disk
 	```bash
 	mkdir /mnt/exthd	
-	#mount /dev/vda /mnt/exthd
+	# mount /dev/vda /mnt/exthd
 	mount /dev/sdg1 /mnt/exthd
 	cd /mnt/exthd
 	```
 
-#(OPTIONAL) - Perform speed test on disk:
+# (OPTIONAL) - Perform speed test on disk:
 	```bash
 	mkdir /mnt/exthd/temp
 	cd /mnt/exthd/temp
@@ -60,7 +60,7 @@ Notes on migrating data to NAS:
 	```
 	--you should see output of time and speed it took to write the bigFile
 
-#View drive space usage and directory sizes:
+# View drive space usage and directory sizes:
 	df -H
 	You can use the `du` (disk usage) command to view all directories with their size of contents. Here's a command that lists all directories in the current directory along with their sizes in a human-readable format:
 
@@ -85,7 +85,7 @@ Notes on migrating data to NAS:
 	du -h --max-depth=1 /path/to/directory | sort -h
 	```
 
-#Copy data to NAS drives for use by Plex etc.
+# Copy data to NAS drives for use by Plex etc.
 	--rsync [options] [source] [dest]
 	--TEST Music first:
 	```bash
@@ -106,13 +106,13 @@ Notes on migrating data to NAS:
 	
 	--issues:
 	sending incremental file list
-              0   0%    0.00kB/s    0:00:00 (xfr#0, to-chk=525/16642)
+              0   0%    0.00kB/s    0:00:00 (xfr# 0, to-chk=525/16642)
 	TV Shows/That '70s Show/Season 08/That '70s Show - s08e22 - That '70s Finale.mkv
 			626.28M   0%    2.53MB/s    0:03:56 (xfr#1, to-chk=503/16642)
 	TV Shows/The Big Bang Theory/Season 8/The Big Bang Theory - s08e10 - The Champagne Reflection.mkv
 			969.64M   0%    3.68MB/s    0:04:11 (xfr#2, to-chk=0/16642)
 
-#Set the permissions on the Plex Directories and Files so that Plex can "see" them:
+# Set the permissions on the Plex Directories and Files so that Plex can "see" them:
 	find /naspool/share/Plex/Library -type d -exec chmod 755 {} \;
 	find /naspool/share/Plex/Library -type f -exec chmod 644 {} \;
 	
@@ -149,12 +149,12 @@ Notes on migrating data to NAS:
 	The group can read the file.
 	Others can read the file.
 	-->
-#Unmount drive when done and unplug drive
+# Unmount drive when done and unplug drive
 	```bash
 	umount /mnt/exthd 
 	```
 	
-#Rescan Plex files on plex dashboard.
+# Rescan Plex files on plex dashboard.
 	Go to Settings > Manage > Libraries (bottom left) > Press "Scan Library Files" button
 
 

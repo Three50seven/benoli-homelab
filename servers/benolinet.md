@@ -6,7 +6,7 @@ fullname: benolinet.krimmhouse.local
 URL: https://192.168.1.253:8006 (Temp until installed as main router)
 MGMT interface: enp2s0
 
-#Physical Machine info:
+# Physical Machine info:
 Product: MINI PC
 MODEL: Beeline-EQ12-A
 EQ12-A-16512SD0W64PRO-BC/XB
@@ -22,7 +22,7 @@ Amazon Description:
 * 4K Triple Display, 
 * Home/Office Desktop PC
 
-#Beelink EQ12 & EQ12Pro - How to Set Auto Power On (for power outages and restore)
+# Beelink EQ12 & EQ12Pro - How to Set Auto Power On (for power outages and restore)
 * Requirements - must be physically connected to the PC via HDMI or monitor connection - this cannot be done remotely
 * ref: https://www.reddit.com/r/BeelinkOfficial/comments/13lqrz4/beelink_eq12_eq12pro_how_to_set_auto_power_on/
 1. Press the Del key repeatedly after powering on the mini PC to enter the BIOS setup
@@ -33,12 +33,12 @@ Amazon Description:
 6. Press the F4 and select “Yes” to save the configuration.
 * You can unplug the power supply and then plug it back to test whether the setup succeeded
 	
-#Create ZFS Pool with remaining diskspace:
-##See ...\Dropbox\Main\HomeServers\linux-notes\partition-storage-device-linux.md for notes on using the rest of the partition not used by the root file system of Proxmox
-##Run Command to view free space and disk usage stats in human readable format - note the "Type", you should see ZFS pools that can be imported
+# Create ZFS Pool with remaining diskspace:
+## See ...\Dropbox\Main\HomeServers\linux-notes\partition-storage-device-linux.md for notes on using the rest of the partition not used by the root file system of Proxmox
+## Run Command to view free space and disk usage stats in human readable format - note the "Type", you should see ZFS pools that can be imported
 df -Th
 
-#See ...\Dropbox\Main\HomeServers\linux-notes\zfs-file-system-notes.md FOR MORE ZFS POOL COMMANDS, SPECIFICALLY NOTES ABOUT IMPORTING POOL FROM PREV. SYSTEM IF THIS IS A REINSTALL OF PROXMOX:
+# See ...\Dropbox\Main\HomeServers\linux-notes\zfs-file-system-notes.md FOR MORE ZFS POOL COMMANDS, SPECIFICALLY NOTES ABOUT IMPORTING POOL FROM PREV. SYSTEM IF THIS IS A REINSTALL OF PROXMOX:
 zpool list
 OUTPUT SHOULD LOOK SOMETHING LIKE THIS:
 NAME      SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
@@ -47,11 +47,11 @@ rpool    63.5G  1.78G  61.7G        -         -     0%     2%  1.00x    ONLINE  
 zbarrel   928G   305G   623G        -         -     0%    32%  1.00x    ONLINE  -
 zkeg      400G  1.95M   400G        -         -     0%     0%  1.00x    ONLINE  -
 
-#Potentially remove the nag (popop warning) about licensing in Proxmox Web Manager:
+# Potentially remove the nag (popop warning) about licensing in Proxmox Web Manager:
 https://dannyda.com/2020/05/17/how-to-remove-you-do-not-have-a-valid-subscription-for-this-server-from-proxmox-virtual-environment-6-1-2-proxmox-ve-6-1-2-pve-6-1-2/
 
-#Update the APT (Advance Package Tool) Repositories in Proxmox Host:
-#Guide: https://benheater.com/bare-metal-proxmox-laptop/amp/
+# Update the APT (Advance Package Tool) Repositories in Proxmox Host:
+# Guide: https://benheater.com/bare-metal-proxmox-laptop/amp/
 	# Comment out the enterprise repositories - using Command Line:
 	sed '/^[^#]/ s/^/# /' -i /etc/apt/sources.list.d/pve-enterprise.list
 	sed '/^[^#]/ s/^/# /' -i /etc/apt/sources.list.d/ceph.list
@@ -60,15 +60,15 @@ https://dannyda.com/2020/05/17/how-to-remove-you-do-not-have-a-valid-subscriptio
 	echo -e '\n# Proxmox community package repository' >> /etc/apt/sources.list
 	echo "deb http://download.proxmox.com/debian/pve $(grep CODENAME /etc/os-release | cut -d '=' -f 2) pve-no-subscription" >> /etc/apt/sources.list
 
-#Then run the following to clean and update:
+# Then run the following to clean and update:
 	apt clean && apt update
 	
-#Run upgrade to upgrade all packages to latest:
+# Run upgrade to upgrade all packages to latest:
 	#NOTE: You can use "apt --dry-run upgrade" for a dry-run before upgrading
 	#Reference: https://www.baeldung.com/linux/list-upgradable-packages
 	apt upgrade
 	
-#Make sure zpool is listed as storage option for VMs and OSs:
+# Make sure zpool is listed as storage option for VMs and OSs:
 go to the Proxmox of host machine on local IP, them go to Datacenter > Storage > Add > ZFS > Choose the zpool you wanted to add.
 You can also setup ZFS storage (for VM and Container Disks) as thin provisioned disks
 !Warning - you can over-provision the disk if you are not careful with the assignment of storage space to each VM and Container you create.

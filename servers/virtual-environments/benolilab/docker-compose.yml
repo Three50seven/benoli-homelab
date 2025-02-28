@@ -84,7 +84,7 @@ services:
           server_net:
             ipv4_address: 172.18.0.12
         volumes:
-            - ./data:/app/data
+            - uptime_kuma_data:/app/data
             - /var/run/docker.sock:/var/run/docker.sock
         ports:
             # <Host Port>:<Container Port>
@@ -114,9 +114,9 @@ services:
             - PUID=1000
             - PGID=1000
         volumes:
-            - /plex/database:/config
-            - /plex/transcode:/transcode
-            - /plex/media:/data
+            - plex_server_config:/config
+            - plex_server_transcode:/transcode
+            - plex_server_media:/data
             - /mnt/naspool:/naspool
             - /mnt/sdb:/localmedia
         devices:
@@ -142,8 +142,8 @@ services:
             BACKUP_FILENAME: backup-%Y-%m-%dT%H-%M-%S.tar.gz
             BACKUP_PRUNING_PREFIX: backup-
             BACKUP_RETENTION_DAYS: 5
-            BACKUP_CRON_EXPRESSION: 0 3 * * *
-            SSH_HOST_NAME: /run/secrets/volume_backup_nas_ip
+            BACKUP_CRON_EXPRESSION: 0 10 * * *
+            SSH_HOST_NAME: ${NAS_IP_ADDRESS}
             SSH_PORT: 22
             SSH_USER: /run/secrets/volume_backup_nas_user
             SSH_PASSWORD: /run/secrets/volume_backup_nas_pw
@@ -152,11 +152,11 @@ services:
             - /etc/timezone:/etc/timezone:ro
             - /etc/localtime:/etc/localtime:ro
             - /var/run/docker.sock:/var/run/docker.sock:ro
-            - /plex/database:/backup/plex_server_config:ro
-            - /plex/transcode:/backup/plex_server_transcode:ro
-            - /plex/media:/backup/plex_server_media:ro
+            - plex_server_config:/backup/plex_server_config:ro
+            - plex_server_transcode:/backup/plex_server_transcode:ro
+            - plex_server_media:/backup/plex_server_media:ro
             - portainer_data:/backup/portainer_data:ro
-            - ./data:/backup/uptime_kuma_data:ro
+            - uptime_kuma_data:/backup/uptime_kuma_data:ro
             - nginx_proxy_config:/backup/nginx_proxy_config:ro
             - nginx_proxy_data:/backup/nginx_proxy_data:ro
             - nginx_proxy_letsencrypt:/backup/nginx_proxy_letsencrypt:ro
@@ -239,6 +239,14 @@ volumes:
         name: adguard_work
     adguard_conf:
         name: adguard_conf
+    uptime_kuma_data:
+        name: uptime_kuma_data
+    plex_server_config:
+        name: plex_server_config
+    plex_server_transcode:
+        name: plex_server_transcode
+    plex_server_media:
+        name: plex_server_media
 networks:
     server_net:
         name: server_net
