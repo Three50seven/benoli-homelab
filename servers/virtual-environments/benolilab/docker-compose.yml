@@ -8,6 +8,8 @@ secrets:
         file: ./secrets/.volume_backup_nas_user
     volume_backup_nas_pw:
         file: ./secrets/.volume_backup_nas_pw
+    backup_notifications_discord_hook_url:
+        file: ./secrets/.backup_notifications_discord_hook_url
 services:
     portainer:
         container_name: "portainer"
@@ -146,6 +148,8 @@ services:
             SSH_USER_FILE: /run/secrets/volume_backup_nas_user
             SSH_PASSWORD_FILE: /run/secrets/volume_backup_nas_pw
             SSH_REMOTE_PATH: /naspool/backups/benolilab-docker/container-volumes
+            NOTIFICATION_LEVEL: info
+            NOTIFICATION_URLS_FILE: /run/secrets/backup_notifications_discord_hook_url
         volumes:
             - /etc/timezone:/etc/timezone:ro
             - /etc/localtime:/etc/localtime:ro
@@ -164,6 +168,7 @@ services:
         secrets:
             - volume_backup_nas_user
             - volume_backup_nas_pw
+            - backup_notifications_discord_hook_url
         labels:
             - com.centurylinklabs.watchtower.enable=true 
         healthcheck:
