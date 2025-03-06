@@ -82,7 +82,7 @@ Per the homenetworkguy, this can cause the web GUI and even SSH to freeze
 Guide: https://homenetworkguy.com/how-to/virtualize-opnsense-on-proxmox-as-your-primary-router/
 Network setup Guide: https://www.youtube.com/watch?v=CXp0CgilMRA
 
-#OPNSense Configuration with ISP Gateway:
+# OPNSense Configuration with ISP Gateway:
 https://homenetworkguy.com/how-to/use-opnsense-router-behind-another-router/
 https://www.pcguide.com/router/how-to/use-with-att-fiber/
 https://github.com/owenthewizard/opnatt
@@ -115,11 +115,6 @@ Reconfigure Devices:
 Ensure that all devices on your network are updated to use the new subnet.
 
 
-#Setup AdGuard Home on OPNSense:
-https://www.youtube.com/watch?v=_JhQn30mqCw
-
-
-
 ==========================
 CREATE PROXMOX BACKUPS
 ==========================
@@ -128,3 +123,14 @@ References: https://www.vinchin.com/vm-backup/proxmox-offsite-backup.html
 	By default additional mount points besides the Root Disk mount point are not included in backups. 
 	For volume mount points you can set the Backup option to include the mount point in the backup. 
 	Device and bind mounts are never backed up as their content is managed outside the Proxmox VE storage library.
+
+# OPNSense Config Backups:
+ref: https://docs.opnsense.org/manual/backups.html
+Offsite backup stored in dropbox
+
+# WireGuard Config and setup
+ref: https://docs.opnsense.org/manual/how-tos/wireguard-client.html
+
+# Setup Dynamic DNS (to update hostname with public IP if it changes from ISP)
+Make sure to add os-ddclient (Dynamic DNS Service) to OPNsense to update the noip domain with an updated IP if it every changes
+ref: https://homenetworkguy.com/how-to/configure-dynamic-dns-opnsense/
