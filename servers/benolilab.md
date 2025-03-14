@@ -1,3 +1,4 @@
+# Lab Server (hosts Docker and Other VMs)
 SETUP DATE: 2024.11.29 (TBD)
 Specified ZFS RAID0 for root system - 65GB partition
 Installed Proxmox VE 8.2 (updated 2024.04.24)
@@ -6,12 +7,7 @@ URL: https://192.168.1.102:8006 (TBD)
 2024.11.29 - installed new SSD:
 	500GB capacity
 	Samsung 870 EVO - V-NAND SSD
-	PN: MZ7L3500HBLU
 	Model: MZ-77E500
-	R-R-SEC-MZ-77E2T0
-	SN: S6PXNU0X329024R
-	WWN: 5002538F543442E5
-	PSID: 22393P5Q293P7Y4RBGFUR961LYYVJ1KT
 
 # Physical Machine info:
 Product: MINI TOWER PC

@@ -1,3 +1,4 @@
+# Network Server
 2024.08.07
 Press DEL Key to enter BIOS
 Specified ZFS RAID0 for root system - 100GB partition
@@ -9,9 +10,6 @@ MGMT interface: enp2s0
 # Physical Machine info:
 Product: MINI PC
 MODEL: Beeline-EQ12-A
-EQ12-A-16512SD0W64PRO-BC/XB
-SN: BN1004GG50552
-9B.US3020826K40
 Amazon Description:
 * Beelink Dual LAN 2.5Gb Mini PC, 
 * EQ12 Intel Alder-Lake N100 (up to 3.4GHz), 
@@ -73,12 +71,12 @@ go to the Proxmox of host machine on local IP, them go to Datacenter > Storage >
 You can also setup ZFS storage (for VM and Container Disks) as thin provisioned disks
 !Warning - you can over-provision the disk if you are not careful with the assignment of storage space to each VM and Container you create.
 
-#Disable the local-zfs or local storage disk (where the root of Proxmox is installed) to avoid over-provisioning and potentially freezing proxmox etc.
+# Disable the local-zfs or local storage disk (where the root of Proxmox is installed) to avoid over-provisioning and potentially freezing proxmox etc.
 Go to Datacenter > Storage > click "local-zfs" or whatever local storage is called, > Edit > uncheck "Enable"
 This prevents the local storage where the OS is installed from being used by containers, ISO storage, etc.;
 Per the homenetworkguy, this can cause the web GUI and even SSH to freeze
 
-#Setup VM with OPNSense:
+# Setup VM with OPNSense:
 Guide: https://homenetworkguy.com/how-to/virtualize-opnsense-on-proxmox-as-your-primary-router/
 Network setup Guide: https://www.youtube.com/watch?v=CXp0CgilMRA
 
