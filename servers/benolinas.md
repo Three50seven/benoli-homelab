@@ -106,4 +106,42 @@ systemctl restart sshd
 ```
 
 # Setup External Backup for naspool
+Added external drives (12 TB)
+List new disks
+```
+lsblk
+```
+Identify the ZFS Pool
+```
+zpool list
+```
+Format the USB Drive as a ZFS Pool (If Not Already)
+If your USB drive isn't formatted for ZFS yet, create a new ZFS pool on it:
+NOTE: Replace naspool_backup1 with a name for your backup pool, and "sdg" with the device/disk path
+	using -f will force the pool to be created and ignores partitions (all data on the disk will be deleted)
+```
+zpool create -f naspool_backup1 /dev/sdg
+zpool create -f naspool_backup2 /dev/sdh
+```
 TBD - 2025.03.14 - Left off here
+
+When swapping disks, always export the active pool first:
+```
+zpool export naspool_backup1
+# OR:
+zpool export naspool_backup2
+```
+Then physically swap the disk.
+Import the New Backup Disk When Inserted:
+```
+zpool import naspool_backup1
+# OR:
+zpool import naspool_backup2
+```
+Use ZFS Send/Receive for Incremental Backups:
+Example:
+```
+zfs send -R -i naspool@lastbackup naspool@newbackup | zfs receive -F backup1/naspool_backup
+```
+Label the Physical Drives:
+Physically marking disks as backup1 and backup2 helps avoid confusion when rotating.
