@@ -105,7 +105,7 @@ chmod -R u+rw /naspool/backups/benolilab-docker
 systemctl restart sshd
 ```
 
-# Setup External Backup for naspool
+# Setup External Backup for ZFS Pool
 Added external drives (12 TB)
 List new disks
 ```
@@ -123,7 +123,86 @@ NOTE: Replace naspool_backup1 with a name for your backup pool, and "sdg" with t
 zpool create -f naspool_backup1 /dev/sdg
 zpool create -f naspool_backup2 /dev/sdh
 ```
-TBD - 2025.03.14 - Left off here
+
+## Automatic ZFS Backups
+Create or upload script file:
+```
+nano /opt/scripts/naspool_zfs_backup/zfs_backup.sh
+```
+Paste the script text from ./scripts/zfs_backup.sh and save (CTRL+X, then Y, then Enter).
+
+Make the scripts directory executable:
+```
+chmod -R +x /opt/scripts
+```
+
+Schedule with Cron:
+```
+# List cron jobs:
+crontab -l
+
+#View cron service: 
+systemctl status cron
+
+# Edit crontab (add a job)
+crontab -e
+```
+Add this line to run the script daily at 4am:
+Note: This also logs the output to /var/log/zfs_backup.log and notifies via discord if the cron job fails
+```
+0 4 * * * /opt/scripts/naspool_zfs_backup/zfs_backup.sh >> /var/log/zfs_backup.log 2>&1 || curl -H "Content-Type: application/json" -X POST -d '{"content": ":x: **ZFS Backup Failed!** The script did not execute properly."}' https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
+
+# TO DISABLE, either remove the line entirely or add a comment, like so (then save and exit):
+# 0 4 * * * /opt/scripts/...
+```
+To check snapshots on the backup pool:
+```
+zfs list -t snapshot | grep $BACKUP_POOL
+```
+
+## Manual ZFS Backups:
+Create a Snapshot of Your Pool
+Take a snapshot of your main ZFS pool (naspool in this example):
+The -r flag ensures snapshots are recursive for all datasets.
+```
+zfs snapshot -r naspool@backup_YYYYMMDD
+
+# View Snapshots with:
+zfs list -t snapshot
+
+# View snapshots for a specific pool
+zfs list -t snapshot naspool
+
+# View more details:
+zfs list -r -t snapshot -o name,used,referenced,creation naspool
+
+# View shorter format, names only (useful for scripting): 
+zfs list -H -o name -t snapshot
+```
+
+Send the Snapshot to the USB Drive
+To perform a full backup:
+This sends all datasets, preserving properties and snapshots.
+```
+zfs send -R naspool@backup_YYYYMMDD | zfs receive -F naspool_backup1/naspool_backup_YYYYMMDD
+```
+
+Incremental Backups (After the First Backup)
+For incremental backups:
+1. Take a new snapshot:
+```
+zfs snapshot -r naspool@backup2
+```
+2. Send only the differences since the last snapshot:
+```
+zfs send -R -i naspool@backup naspool@backup2 | zfs receive -F naspool_backup1/naspool_backup
+```
+3. Delete old snapshots if needed:
+```
+zfs destroy naspool@backup
+```
+
+## Swapping disks:
 
 When swapping disks, always export the active pool first:
 ```
