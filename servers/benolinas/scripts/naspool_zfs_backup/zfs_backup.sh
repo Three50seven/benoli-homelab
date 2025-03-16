@@ -11,10 +11,11 @@ DISK_USAGE_LOG="/var/log/zfs_disk_usage.log"
 
 # Detect the active backup pool
 # This will only grab the first match for a pool name that contains "naspool_backup". If both naspool_backup1 and naspool_backup2 are available, it will only grab the first pool it encounters in the list, which could be either naspool_backup1 or naspool_backup2, depending on the order in which they are listed by zpool list.
-BACKUP_POOL=$(zpool list -H -o name | grep "naspool_backup")
+BACKUP_POOL=$(zpool list -H -o name | grep -m1 "naspool_backup")
 
 # Discord Webhook URL (Replace with your actual webhook)
-DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
+# NOTE: This is read from a directory called ".secrets"
+DISCORD_WEBHOOK_URL=$(awk 'NR==1' ./secrets/.zfs_backups_discord_webhook)
 
 # Minimum required free space in GB
 WARNING_THRESHOLD=100  # Send a warning if below this
@@ -26,7 +27,8 @@ RETENTION_DAYS=7  # Retention period for snapshots (adjust as needed)
 # Function to send a Discord notification
 send_discord_notification() {
     MESSAGE=$1
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"$MESSAGE\"}" $DISCORD_WEBHOOK_URL
+    JSON_MESSAGE=$(jq -Rn --arg msg "$MESSAGE" '{content: $msg}')
+    curl -H "Content-Type: application/json" -X POST -d "$JSON_MESSAGE" "$DISCORD_WEBHOOK_URL"
 }
 
 # Log start of backup

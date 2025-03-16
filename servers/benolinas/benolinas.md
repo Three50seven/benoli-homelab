@@ -136,6 +136,14 @@ Make the scripts directory executable:
 chmod -R +x /opt/scripts
 ```
 
+Setup dependency (jq) to use for json formatting of discord messages used in script:
+```
+apt update && apt install jq -y
+```
+
+Create a "secrets" directory in the /opt/scripts/naspool_zfs_backup and upload the .zfs_backups_discord_webhook file from secrets
+NOTE: This is used in the bash scripts so that secrets are not kept in source control.
+
 Schedule with Cron:
 ```
 # List cron jobs:

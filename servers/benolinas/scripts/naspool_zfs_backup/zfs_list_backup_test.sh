@@ -14,7 +14,7 @@ DISK_USAGE_LOG="/var/log/zfs_disk_usage_test.log"
 BACKUP_POOL=$(zpool list -H -o name | grep "naspool_backup")
 
 # Discord Webhook URL (Replace with your actual webhook)
-DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
+DISCORD_WEBHOOK_URL=$(awk 'NR==1' ./secrets/.zfs_backups_discord_webhook)
 
 # Minimum required free space in GB
 WARNING_THRESHOLD=100  # Send a warning if below this
@@ -26,20 +26,20 @@ RETENTION_DAYS=7  # Retention period for snapshots (adjust as needed)
 # Function to send a Discord notification
 send_discord_notification() {
     MESSAGE=$1
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"$MESSAGE\"}" $DISCORD_WEBHOOK_URL
+    JSON_MESSAGE=$(jq -Rn --arg msg "$MESSAGE" '{content: $msg}')
+    curl -H "Content-Type: application/json" -X POST -d "$JSON_MESSAGE" "$DISCORD_WEBHOOK_URL"
 }
 
 send_snapshot_list() {
-    # Get the last 7 snapshots (to avoid long messages) and format them in a simple list
-    SNAPSHOT_LIST=$(zfs list -t snapshot -o name,creation -s creation | tail -7 | awk '{print "**"$1"** - "$2" "$3" "$4}' | tr '\n' ' ')
+    # Get the last 7 snapshots and format them as a list
+    SNAPSHOT_LIST=$(zfs list -t snapshot -o name,creation -s creation | tail -7 | awk '{print "**"$1"** - "$2" "$3" "$4}' | jq -R . | jq -s .)
 
-    # Format for Discord (message body)
-    MESSAGE="**Latest Snapshots:**\n$SNAPSHOT_LIST"
+    # Format the JSON payload using jq
+    JSON_MESSAGE=$(jq -n --argjson snapshots "$SNAPSHOT_LIST" --arg title "**Latest Snapshots:**" '{content: ($title + "\n" + ($snapshots | join("\n")))}')
 
     # Send to Discord (webhook)
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"$MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
+    curl -H "Content-Type: application/json" -X POST -d "$JSON_MESSAGE" "$DISCORD_WEBHOOK_URL"
 }
-
 
 # Log start of backup
 echo "$(date) - Starting ZFS backup TEST" | tee -a $LOG_FILE
