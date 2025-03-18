@@ -212,3 +212,7 @@ ssh user@192.168.x.x
 	docker exec -it <container_id_or_name> /bin/sh
 ```
 - Access the Container: You will now be inside the container and can run commands as needed.
+
+# Docker Volumes and files location on host:
+/var/lib/docker
+e.g. Volumes are here: /var/lib/docker/volumes
