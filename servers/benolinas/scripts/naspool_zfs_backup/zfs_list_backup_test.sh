@@ -11,17 +11,15 @@ DISK_USAGE_LOG="/var/log/zfs_disk_usage_test.log"
 
 # Detect the active backup pool
 # NOTE: This will only grab the first match for a pool name that contains "naspool_backup". If both naspool_backup1 and naspool_backup2 are available, it will only grab the first pool it encounters in the list, which could be either naspool_backup1 or naspool_backup2, depending on the order in which they are listed by zpool list.
-BACKUP_POOL=$(zpool list -H -o name | grep "naspool_backup")
+BACKUP_POOL=$(zpool list -H -o name | grep -m1 "naspool_backup")
 
 # Discord Webhook URL (Replace with your actual webhook)
-DISCORD_WEBHOOK_URL=$(awk 'NR==1' ./secrets/.zfs_backups_discord_webhook)
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+DISCORD_WEBHOOK_URL=$(awk 'NR==1' "$SCRIPT_DIR/secrets/.zfs_backups_discord_webhook")
 
 # Minimum required free space in GB
 WARNING_THRESHOLD=100  # Send a warning if below this
 CRITICAL_THRESHOLD=50  # Stop backup if below this
-
-# Snapshot retention period (days)
-RETENTION_DAYS=7  # Retention period for snapshots (adjust as needed)
 
 # Function to send a Discord notification
 send_discord_notification() {
@@ -82,5 +80,5 @@ SNAPSHOT_NAME="backup_$DATE"
 send_snapshot_list
 
 # Send success message
-send_discord_notification ":tada: **Backup Completed Successfully!**"
-echo "$(date) - Backup process complete!" | tee -a $LOG_FILE
+send_discord_notification ":tada: **Backup TEST Completed Successfully!**"
+echo "$(date) - Backup TEST process complete!" | tee -a $LOG_FILE
