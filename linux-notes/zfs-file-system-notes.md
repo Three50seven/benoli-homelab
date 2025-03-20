@@ -114,3 +114,45 @@ Example:
     zfs receive -s <token> rpool/data/vm-200-disk-0
 `
     Replace <token> with the actual token value obtained in the previous step.
+
+# List ZFS Pool info:
+```
+zfs list -r -o name,used,available,referenced naspool_backup2
+```
+
+
+# Rename a snapshot and its descendant datasets:
+```
+zfs rename naspool@backup_20250314 naspool@daily_backup_20250314
+zfs rename naspool@backup_20250315 naspool@daily_backup_20250315
+zfs rename naspool@backup_20250316 naspool@daily_backup_20250316
+zfs rename naspool/backups@backup_20250314 naspool/backups@daily_backup_20250314
+zfs rename naspool/backups@backup_20250315 naspool/backups@daily_backup_20250315
+zfs rename naspool/backups@backup_20250316 naspool/backups@daily_backup_20250316
+zfs rename naspool/share@backup_20250314 naspool/share@daily_backup_20250314
+zfs rename naspool/share@backup_20250315 naspool/share@daily_backup_20250315
+zfs rename naspool/share@backup_20250316 naspool/share@daily_backup_20250316
+```
+
+# Rename datasets and destroy empty parent afterwards:
+```
+# First rename datasets to match main naspool
+zfs rename naspool_backup1/naspool_backup_20250314/backups naspool_backup1/backups
+zfs rename naspool_backup1/naspool_backup_20250314/share naspool_backup1/share
+
+zfs rename naspool_backup2/naspool_backup_20250314/backups naspool_backup2/backups
+zfs rename naspool_backup2/naspool_backup_20250314/share naspool_backup2/share
+
+# List all datasets for all pools
+zfs list
+
+# Or list for specifig pool:
+zfs list -r naspool_backup1
+zfs list -r naspool_backup2
+```
+The -r flag ensures that all nested datasets under naspool_backup1/naspool_backup_20250314 are destroyed.
+So make sure the datasets are moved outside the parent first by renaming them (above)
+```
+zfs destroy naspool_backup1/naspool_backup_20250314
+zfs destroy naspool_backup2/naspool_backup_20250314
+```
