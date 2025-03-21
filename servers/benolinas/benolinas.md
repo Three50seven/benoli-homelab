@@ -207,6 +207,33 @@ zfs list -r -t snapshot -o name,used,referenced,creation naspool
 
 # View shorter format, names only (useful for scripting): 
 zfs list -H -o name -t snapshot
+
+# View snapshot list that are older than a specific time frame (in this case older than 2 hours)
+# The date comparison can be changed to something like '3 days ago', '12 weeks ago' etc.
+# Example to run in terminal for debugging:
+	zfs list -H -t snapshot -o name,creation | grep "daily" | awk -F ' ' -v date="$(date -d '2 hours ago' +%s)" '
+	{
+		# Convert the creation date to a Unix timestamp
+		cmd = "date -d \"" $2 " " $3 " " $4 " " $5 " " $6 "\" +%s"
+		cmd | getline creation_time
+		close(cmd)
+    
+		# Compare the creation time with the date from 2 hours ago
+		if (creation_time < date) {
+			print $1
+		}
+	}'
+
+# Or cleaner way without relying on awk:
+	SNAP_TYPE="daily" &&
+	DATE_FILTER="$(date -d '2 hours ago' +%s)" &&
+	zfs list -H -t snapshot -o name,creation | grep "$SNAP_TYPE" | while read -r SNAP CREATION; do
+		CREATION_TIMESTAMP=$(date -d "$CREATION" +%s)
+		if (( CREATION_TIMESTAMP < DATE_FILTER )); then
+			echo "Processing snapshot: $SNAP"
+			# Add your processing commands here
+		fi
+	done
 ```
 
 Send the Snapshot to the USB Drive
