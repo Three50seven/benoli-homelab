@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 # ZFS Backup TEST Script with Disk Space Monitoring, Logging, Retention Period & Discord Notifications
 
