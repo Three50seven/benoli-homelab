@@ -156,30 +156,51 @@ systemctl status cron
 crontab -e
 ```
 Add this line to run the script daily at 4am:
-Note: This also logs the output to /var/log/zfs_backup.log and notifies via discord if the cron job fails
+Note: this is the setup for each of the cron tasks (one for each of the backup periods: daily, weekly, monthly, and another for yearly)
+```
+# Daily snapshot at 4am, retain 7 snapshots
+0 4 * * * /opt/scripts/naspool_zfs_backup/zfs_backup.sh daily 7
+
+# Weekly snapshot on Sunday at 4am, retain 5 snapshots
+0 4 * * 0 /opt/scripts/naspool_zfs_backup/zfs_backup.sh weekly 5
+
+# Monthly snapshot on the 1st at 4am, retain 3 snapshots
+0 4 1 * * /opt/scripts/naspool_zfs_backup/zfs_backup.sh monthly 3
+
+# Yearly snapshot on January 1st at 4am, retain 1 snapshots
+0 4 1 1 * /opt/scripts/naspool_zfs_backup/zfs_backup.sh yearly 1
+```
+
+Alternative - with log and discord message (but this has since been built into the main script)
+Note: This also logs the output to /var/log/zfs_backup.log and notifies via discord if the cron job fails - this has since been built into the backup script
 ```
 0 4 * * * /opt/scripts/naspool_zfs_backup/zfs_backup.sh >> /var/log/zfs_backup.log 2>&1 || curl -H "Content-Type: application/json" -X POST -d '{"content": ":x: **ZFS Backup Failed!** The script did not execute properly."}' https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
 
 # TO DISABLE, either remove the line entirely or add a comment, like so (then save and exit):
 # 0 4 * * * /opt/scripts/...
 ```
+
 To check snapshots on the backup pool:
 ```
 zfs list -t snapshot | grep $BACKUP_POOL
 ```
 
 ## Manual ZFS Backups:
+*NOTE: This is needed for the initial backup and full-send to the backup pool(s)*
 Create a Snapshot of Your Pool
 Take a snapshot of your main ZFS pool (naspool in this example):
 The -r flag ensures snapshots are recursive for all datasets.
 ```
-zfs snapshot -r naspool@backup_YYYYMMDD
+zfs snapshot -r naspool@daily_backup_YYYYMMDD
 
 # View Snapshots with:
 zfs list -t snapshot
 
-# View snapshots for a specific pool
+# View or list snapshots for a specific pool
 zfs list -t snapshot naspool
+
+# or use the following to view all snapshots for all pools:
+zfs list -H -t snapshot -o name
 
 # View more details:
 zfs list -r -t snapshot -o name,used,referenced,creation naspool
@@ -191,8 +212,11 @@ zfs list -H -o name -t snapshot
 Send the Snapshot to the USB Drive
 To perform a full backup:
 This sends all datasets, preserving properties and snapshots.
+-R sends the entire hierarchy (all datasets and snapshots).
+-F forces a rollback on the destination if needed.
+-d drops the source pool name when receiving, so sourcepool/dataset becomes targetpool/dataset.
 ```
-zfs send -R naspool@backup_YYYYMMDD | zfs receive -F naspool_backup1/naspool_backup_YYYYMMDD
+zfs send -R naspool@daily_backup_YYYYMMDD | zfs receive -Fdu naspool_backup1
 ```
 
 Incremental Backups (After the First Backup)
@@ -203,7 +227,7 @@ zfs snapshot -r naspool@backup2
 ```
 2. Send only the differences since the last snapshot:
 ```
-zfs send -R -i naspool@backup naspool@backup2 | zfs receive -F naspool_backup1/naspool_backup
+zfs send -R -i naspool@backup naspool@backup2 | zfs receive -Fdu naspool_backup1
 ```
 3. Delete old snapshots if needed:
 ```
