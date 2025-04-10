@@ -255,7 +255,12 @@ zfs snapshot -r naspool@backup2
 2. Send only the differences since the last snapshot:
 ```
 zfs send -R -i naspool@backup naspool@backup2 | zfs receive -Fdu naspool_backup1
+
+# Examples:
+zfs send -R -i naspool@daily_backup_20250321 naspool@daily_backup_20250403 | zfs receive -Fdu naspool_backup1
+zfs send -R -i naspool@daily_backup_20250321 naspool@daily_backup_20250403 | zfs receive -Fdu naspool_backup2
 ```
+
 3. Delete old snapshots if needed:
 ```
 zfs destroy naspool@backup
