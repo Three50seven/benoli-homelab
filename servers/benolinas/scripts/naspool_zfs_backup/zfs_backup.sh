@@ -19,6 +19,7 @@ SNAP_TYPE="$1"
 # Snapshot retention periods
 # If zero (0) - a snapshot will not be taken for that period
 RETENTION_PERIOD="$2"
+MAX_RETENTION_PERIODS=50 # Adjust accordingly, but 50 seems like enough
 
 # Set the source pool
 SOURCE_POOL="naspool"
@@ -34,7 +35,8 @@ log_message() {
 }
 
 # Detect the active backup pool
-BACKUP_POOL=$(zpool list -H -o name | grep -m1 "naspool_backup")
+BACKUP_POOL="naspool_backup2"
+#$(zpool list -H -o name | grep -m1 "naspool_backup")
 
 # Discord Webhook URL (Replace with your actual webhook)
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
@@ -69,10 +71,10 @@ if [[ -z "$SNAP_TYPE" || ! "$SNAP_TYPE" =~ ^(daily|weekly|monthly|yearly)$ ]]; t
 fi
 
 # Verify the snapshot retention period is valid
-if [[ "$RETENTION_PERIOD" =~ ^[0-9]+$ ]] && (( RETENTION_PERIOD >= 0 && RETENTION_PERIOD <= 50 )); then
+if [[ "$RETENTION_PERIOD" =~ ^[0-9]+$ ]] && (( RETENTION_PERIOD >= 0 && RETENTION_PERIOD <= MAX_RETENTION_PERIODS )); then
     log_message "Info: Retention period (${RETENTION_PERIOD}) is valid."
 else
-    log_message "Error: Invalid Retention period (${RETENTION_PERIOD}), this must be a number between 0 and 50."
+    log_message "Error: Invalid Retention period (${RETENTION_PERIOD}), this must be a number between 0 and $MAX_RETENTION_PERIODS."
     exit 1
 fi
 
@@ -131,6 +133,24 @@ SNAP_NAME="${SOURCE_POOL}@${SNAP_ENDING}"
 LAST_SNAP=$(zfs list -H -t snapshot -o name -S creation | grep "^$SOURCE_POOL@$SNAP_TYPE" | head -n 1)
 log_message "Info: Last snapshot: $LAST_SNAP - New snapshot: $SNAP_NAME"
 
+
+
+# TODO: NEED TO GET THE LAST SNAP ON THE BACKUP POOL AND SET THE INCREMENTAL SOURCE TO THAT SNAPSHOT NAME
+# TODO: Do I need to keep a record of snapshots between the naspool and backup pool so that I don't delete the last snapshot that the backup pool has when it was ejected?
+# TODO: Yes, Setup txt file to keep track of which snapshots have been sent to the naspool_backup, name it the same as the backup, naming convention: snapshot_history_[backup_pool_name].txt, e.g.: snapshot_history_naspool_backup1.txt
+# OTHERWISE, GETTING ERRORS LIKE: 
+    Fri Mar 21 03:25:43 PM EDT 2025 - Info: Sending incremental snapshot from naspool@daily_backup_20250321 to naspool@daily_backup_20250321 to backup pool: naspool_backup2.
+    WARNING: could not send naspool@daily_backup_20250321:
+    incremental source (naspool@daily_backup_20250321) is not earlier than it
+    WARNING: could not send naspool/share@daily_backup_20250321:
+    incremental source (naspool/share@daily_backup_20250321) is not earlier than it
+    WARNING: could not send naspool/backups@daily_backup_20250321:
+    incremental source (naspool/backups@daily_backup_20250321) is not earlier than it
+# ALSO, AFTER TESTING ON naspool2, DON'T FORGET TO CHANGE BACK THE BACKUP_POOL VARIABLE ABOVE
+
+
+
+
 # Create new snapshot based on retention settings for this type if one by the same name doesn't already exist
 if [ "$RETENTION_PERIOD" -ne 0 ]; then
     if zfs list -t snapshot -o name | grep -q "$SNAP_NAME"; then
@@ -175,44 +195,35 @@ fi
 # Cleanup old snapshots
 log_message "Info: Checking retention period (${RETENTION_PERIOD}) and cleaning up older snapshots."
 
-delete_old_snapshots() {  
-    local DATE_FILTER
+# TODO: TEST THIS!
+cleanup_snapshots() {  
+    local SNAP_COUNT=0
+    local SNAP_LIMIT=$RETENTION_PERIOD
 
-    case $SNAP_TYPE in
-        daily)
-            DATE_FILTER="$(date -d "$RETENTION_PERIOD days ago" +%s)"
-            ;;
-        weekly)
-            DATE_FILTER="$(date -d "$RETENTION_PERIOD weeks ago" +%s)"
-            ;;
-        monthly)
-            DATE_FILTER="$(date -d "$RETENTION_PERIOD months ago" +%s)"
-            ;;
-        yearly)
-            DATE_FILTER="$(date -d "$RETENTION_PERIOD years ago" +%s)"
-            ;;
-        *)
-        log_message "Warning: Invalid SNAP_TYPE in delete_old_snapshots function. Use daily, weekly, monthly, or yearly."
-        return 1
-        ;;
-    esac
-
-    # List and loop through the snapshots that are older than the retention period and destroy them, based on the SNAP_TYPE
-	zfs list -H -t snapshot -o name,creation | grep "$SNAP_TYPE" | while read -r SNAP CREATION; do
-		CREATION_TIMESTAMP=$(date -d "$CREATION" +%s)
-		if (( CREATION_TIMESTAMP < DATE_FILTER )); then
-			if [ "$IS_TEST" = false ]; then
+    # List and loop through the snapshots based on the SNAP_TYPE
+    zfs list -H -t snapshot -o name,creation | grep "$SNAP_TYPE" | while read -r SNAP CREATION; do
+        if (( SNAP_COUNT < SNAP_LIMIT )); then
+            if [ "$IS_TEST" = false ]; then
                 log_message "Info: Destroying (cleaning up) snapshot $SNAP"
                 zfs destroy -r "$SNAP"
             else
                 log_message "Info: Skipping snapshot cleanup because IS_TEST is true. Snapshot that would be destroyed: $SNAP"
             fi
-		fi
-	done
+            ((SNAP_COUNT++))
+        else
+            break
+        fi
+    done
+
+    if (( SNAP_COUNT == 0 )); then
+        log_message "Info: No snapshots found for cleanup."
+    else
+        log_message "Info: $SNAP_COUNT snapshots cleaned up."
+    fi
 }
 
 # call the function to cleanup older snapshots based on retention period
-delete_old_snapshots
+cleanup_snapshots
 
 # send message 
 if [ "$IS_TEST" = false ]; then
