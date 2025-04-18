@@ -1,8 +1,8 @@
 # ZFS File System on Proxmox Notes
 https://www.youtube.com/watch?v=9H09xnhlCQU&t=389s
-sudo zpool create nas-pool raidz1 /dev/sdc /dev/sdd /dev/sde /dev/sdf
+zpool create naspool raidz1 /dev/sdc /dev/sdd /dev/sde /dev/sdf
 
-sudo zpool create nas-pool mirror /dev/sdc /dev/sdd mirror /dev/sde /dev/sdf
+zpool create naspool mirror /dev/sdc /dev/sdd mirror /dev/sde /dev/sdf
 
 rsync -azr --info=progress2 --delete /mnt/sdb2/MEDIA-NAS_BackupPriorToLinux/ffmpegOutput/ /nas-pool/share/ffmpegOutput/
 
@@ -155,4 +155,46 @@ So make sure the datasets are moved outside the parent first by renaming them (a
 ```
 zfs destroy naspool_backup1/naspool_backup_20250314
 zfs destroy naspool_backup2/naspool_backup_20250314
+```
+
+# Restore ZFS Pool from Replicated ZFS Pool
+1. Import the Backup Pool: Ensure the backup pool naspool_backup1 is imported and accessible.
+```
+zpool import naspool_backup1
+```
+2. Export the Damaged Pool: If the original pool naspool is still imported, export it to avoid conflicts.
+```
+# View status of naspool
+zpool status naspool
+
+# export ot avoid conflicts:
+zpool export naspool
+```
+3. Recreate the Original Pool: If the original pool naspool is severely damaged, you may need to recreate it. This step assumes you have already exported the damaged pool.
+```
+# example: zpool create naspool <disk_devices> mirror <disk_devices_mirror>
+# View disks/devices:
+lsblk
+
+# Command to re-create naspool
+zpool create naspool mirror /dev/sdc /dev/sdd mirror /dev/sde /dev/sdf
+```
+4. Restore Datasets from Backup: Use zfs send and zfs receive to transfer datasets from the backup pool to the original pool. This can be done for each dataset individually or for the entire pool.
+
+Send and Receive Entire Pool:
+```
+zfs send -R naspool_backup1@daily_backup_20250418 | zfs receive -F naspool
+```
+
+Send and Receive Individual Datasets:
+```
+zfs send naspool_backup1/dataset1@daily_backup_20250418 | zfs receive naspool/dataset1
+zfs send naspool_backup1/dataset2@daily_backup_20250418 | zfs receive naspool/dataset2
+# Repeat for all datasets
+```
+
+5. Verify the Restore: After restoring, verify the datasets and ensure they are correctly mounted.
+```
+zfs list
+zfs mount -a
 ```

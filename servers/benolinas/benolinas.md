@@ -257,13 +257,19 @@ zfs snapshot -r naspool@backup2
 zfs send -R -i naspool@backup naspool@backup2 | zfs receive -Fdu naspool_backup1
 
 # Examples:
-zfs send -R -i naspool@daily_backup_20250321 naspool@daily_backup_20250403 | zfs receive -Fdu naspool_backup1
-zfs send -R -i naspool@daily_backup_20250321 naspool@daily_backup_20250403 | zfs receive -Fdu naspool_backup2
+zfs send -R -i naspool@daily_backup_20250403 naspool@daily_backup_20250418 | zfs receive -Fdu naspool_backup1
+zfs send -R -i naspool@daily_backup_20250403 naspool@daily_backup_20250418 | zfs receive -Fdu naspool_backup2
 ```
 
 3. Delete old snapshots if needed:
 ```
 zfs destroy naspool@backup
+```
+
+4. View pool size:
+*Hint - open in a new terminal to "watch" as zfs send/receive is processing*
+```
+zfs list -r -o name,used,available naspool_backup1
 ```
 
 ## Swapping disks:
