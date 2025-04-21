@@ -177,7 +177,14 @@ else
         if [ "$IS_TEST" = false ]; then
             log_message "Info: Sending incremental snapshot from $LAST_SNAP to $SNAP_NAME to backup pool: $BACKUP_POOL."
             zfs send -R -I "$LAST_SNAP" "$SNAP_NAME" | zfs receive -Fdu "$BACKUP_POOL"
-            log_message "Info: Sent incremental snapshot from $LAST_SNAP to $SNAP_NAME to backup pool: $BACKUP_POOL."
+            
+            # Capture/Log the exit status of the zfs send command
+            ZFS_SEND_EXIT_CODE=$?
+            if [ ZFS_SEND_EXIT_CODE -eq 0 ]; then
+                log_message "Info: Successfully sent incremental snapshot from $LAST_SNAP to $SNAP_NAME to backup pool: $BACKUP_POOL."
+            else
+                log_message "Error: Failed to send incremental snapshot from $LAST_SNAP to $SNAP_NAME to backup pool: $BACKUP_POOL. ZFS_SEND_EXIT_CODE: $ZFS_SEND_EXIT_CODE"
+            fi            
         else
             log_message "Info: Skipping ZFS incremental send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP: $LAST_SNAP | SNAP_NAME: $SNAP_NAME"
         fi
@@ -185,7 +192,15 @@ else
         if [ "$IS_TEST" = false ]; then
             log_message "Info: Sending full snapshot $SNAP_NAME to backup pool: $BACKUP_POOL."
             zfs send -R "$SNAP_NAME" | zfs receive -Fdu "$BACKUP_POOL"
-            log_message "Info: Sent full snapshot $SNAP_NAME to backup pool: $BACKUP_POOL."
+            
+            # Capture/Log the exit status of the zfs send command
+            ZFS_SEND_EXIT_CODE=$?
+            if [ ZFS_SEND_EXIT_CODE -eq 0 ]; then
+                log_message "Info: Successfully sent full snapshot $SNAP_NAME to backup pool: $BACKUP_POOL."
+                            
+            else
+                log_message "Error: Failed to send full snapshot $SNAP_NAME to backup pool: $BACKUP_POOL. ZFS_SEND_EXIT_CODE: $ZFS_SEND_EXIT_CODE"
+            fi 
         else
             log_message "Info: Skipping ZFS full send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP: $LAST_SNAP | SNAP_NAME: $SNAP_NAME"
         fi
