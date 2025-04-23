@@ -28,12 +28,6 @@ SOURCE_POOL="naspool"
 LOG_FILE="/var/log/zfs_backup.log"
 DISK_USAGE_LOG="/var/log/zfs_disk_usage.log"
 
-# Function to log messages
-log_message() {
-    local message="$1"
-    echo -e "$(date) - $message" | tee -a "$LOG_FILE"
-}
-
 # Detect the active backup pool
 BACKUP_POOL="naspool_backup2"
 #$(zpool list -H -o name | grep -m1 "naspool_backup")
@@ -50,7 +44,13 @@ SOURCE_POOL_SIZE_WARNING_THRESHOLD=500
 BACKUP_POOL_CRITICAL_THRESHOLD=100  
 SOURCE_POOL_CRITICAL_THRESHOLD=100
 
-# Log start of backup
+# Function to log messages
+log_message() {
+    local message="$1"
+    echo -e "$(date) - $message" | tee -a "$LOG_FILE"
+}
+
+# Log start of backup and do some preliminary checks
 log_message "Info: Starting ZFS $SNAP_TYPE backup on $(hostname) - Variables:\n\tSNAP_TYPE: $SNAP_TYPE\n\t\
 RETENTION_PERIOD: $RETENTION_PERIOD\n\tIS_TEST: $IS_TEST\n\tBACKUP_POOL_SIZE_WARNING_THRESHOLD (GB): $BACKUP_POOL_SIZE_WARNING_THRESHOLD\n\t\
 BACKUP_POOL_CRITICAL_THRESHOLD (GB): $BACKUP_POOL_CRITICAL_THRESHOLD\n\tSOURCE_POOL_SIZE_WARNING_THRESHOLD (GB): $SOURCE_POOL_SIZE_WARNING_THRESHOLD\n\t\
@@ -78,17 +78,24 @@ else
     exit 1
 fi
 
-# Function to send a Discord notification
+# Function to send a Discord notification - note this will also log the message, so no need to call both the log and send functions
 send_discord_notification() {
-    MESSAGE=$1
-    JSON_MESSAGE=$(jq -Rn --arg msg "$MESSAGE" '{content: $msg}')
+    local message=$1
+    local markdown_replaced_message=$(echo "$message" | sed -e 's/:x:/Error:/g' \
+                                               -e 's/\*\*//g' \
+                                               -e 's/:warning:/Warning:/g' \
+                                               -e 's/:white_check_mark:/Info:/g' \
+                                               -e 's/__//g' \
+                                               -e 's/:test_tube:/Test:/g')
+    log_message $markdown_replaced_message # Log the message, then send via discord webhook
+
+    JSON_MESSAGE=$(jq -Rn --arg msg "$message" '{content: $msg}')
     curl -H "Content-Type: application/json" -X POST -d "$JSON_MESSAGE" "$DISCORD_WEBHOOK_URL"
 }
 
 # Check if backup pool is found
 if [ -z "$BACKUP_POOL" ]; then
-    log_message "Error: ZFS Pool Backup failed - No backup pool detected!"
-    send_discord_notification ":x: **ZFS Pool Backup Failed:** No backup pool detected!"
+    send_discord_notification ":x: **ZFS Pool Backup Failed** No backup pool detected!"
     exit 1
 fi
 
@@ -103,23 +110,19 @@ log_message "Info: Source ZFS Pool: $SOURCE_POOL has ${FREE_SPACE_GB_SOURCE_POOL
 
 # Send a warning if space is low on source pool or backup pool
 if (( $(echo "$FREE_SPACE_GB < $BACKUP_POOL_SIZE_WARNING_THRESHOLD" | bc -l) )); then
-    log_message "Warning: Low Disk Space Warning - ${FREE_SPACE_GB}GB free on BACKUP_POOL: **$BACKUP_POOL**!"
-    send_discord_notification ":warning: **Low Disk Space Warning:** ${FREE_SPACE_GB}GB free on BACKUP_POOL: **$BACKUP_POOL**!"
+    send_discord_notification ":warning: **Low Disk Space Warning** - ${FREE_SPACE_GB}GB free on BACKUP_POOL: **$BACKUP_POOL**!"
 fi
 if (( $(echo "$FREE_SPACE_GB_SOURCE_POOL < $SOURCE_POOL_SIZE_WARNING_THRESHOLD" | bc -l) )); then
-    log_message "Warning: Low Disk Space Warning - ${FREE_SPACE_GB_SOURCE_POOL}GB free on SOURCE_POOL: **$SOURCE_POOL**!"
-    send_discord_notification ":warning: **Low Disk Space Warning:** ${FREE_SPACE_GB_SOURCE_POOL}GB free on SOURCE_POOL: **$SOURCE_POOL**!"
+    send_discord_notification ":warning: **Low Disk Space Warning** - ${FREE_SPACE_GB_SOURCE_POOL}GB free on SOURCE_POOL: **$SOURCE_POOL**!"
 fi
 
 # Stop the backup if space is critically low
 if (( $(echo "$FREE_SPACE_GB < $BACKUP_POOL_CRITICAL_THRESHOLD" | bc -l) )); then
-    log_message "Error: ZFS Pool Backup Stopped - Critical disk space alert on BACKUP_POOL: $BACKUP_POOL! Free Space, ${FREE_SPACE_GB}GB is below ${BACKUP_POOL_CRITICAL_THRESHOLD}GB critical threshold."
-    send_discord_notification ":x: **ZFS Pool Backup Stopped:** Critical disk space alert on BACKUP_POOL: **$BACKUP_POOL**! *Free Space, ${FREE_SPACE_GB}GB is below ${BACKUP_POOL_CRITICAL_THRESHOLD}GB critical threshold.*"
+    send_discord_notification ":x: **ZFS Pool Backup Stopped** - Critical disk space alert on BACKUP_POOL: **$BACKUP_POOL**! *Free Space, ${FREE_SPACE_GB}GB is below ${BACKUP_POOL_CRITICAL_THRESHOLD}GB critical threshold.*"
     exit 1
 fi
-if (( $(echo "$FREE_SPACE_GB_SOURCE_POOL < $SOURCE_POOL_CRITICAL_THRESHOLD" | bc -l) )); then
-    log_message "Error: ZFS Pool Backup Stopped - Critical disk space alert on SOURCE_POOL: $SOURCE_POOL! Free Space, ${FREE_SPACE_GB_SOURCE_POOL}GB is below ${SOURCE_POOL_CRITICAL_THRESHOLD}GB critical threshold."
-    send_discord_notification ":x: **ZFS Pool Backup Stopped:** Critical disk space alert on SOURCE_POOL: **$SOURCE_POOL**! *Free Space, ${FREE_SPACE_GB_SOURCE_POOL}GB is below ${SOURCE_POOL_CRITICAL_THRESHOLD}GB critical threshold.*"
+if (( $(echo "$FREE_SPACE_GB_SOURCE_POOL < $SOURCE_POOL_CRITICAL_THRESHOLD" | bc -l) )); then    
+    send_discord_notification ":x: **ZFS Pool Backup Stopped** - Critical disk space alert on SOURCE_POOL: **$SOURCE_POOL**! *Free Space, ${FREE_SPACE_GB_SOURCE_POOL}GB is below ${SOURCE_POOL_CRITICAL_THRESHOLD}GB critical threshold.*"
     exit 1
 fi
 
@@ -242,9 +245,10 @@ cleanup_snapshots
 
 # send message 
 if [ "$IS_TEST" = false ]; then
-    send_discord_notification ":tada: **ZFS ${SNAP_TYPE^} Backup Completed Successfully for ${SOURCE_POOL}** - Snapshot ${SNAP_NAME} sent to ${BACKUP_POOL}. *(see $LOG_FILE for more details)*"
-    log_message "Info: ZFS ${SNAP_TYPE^} backup process complete for ${SOURCE_POOL} - Snapshot ${SNAP_NAME} sent to ${BACKUP_POOL}. (see $LOG_FILE for more details)\n=========="
+    send_discord_notification ":white_check_mark: **ZFS ${SNAP_TYPE^} Backup Completed Successfully for ${SOURCE_POOL}** - Snapshot ${SNAP_NAME} sent to ${BACKUP_POOL}. *(see $LOG_FILE for more details)*"    
 else
-    send_discord_notification ":tada::test_tube: **_Test_ run of ZFS ${SNAP_TYPE^} Backup Completed Successfully** - Snapshot ${SNAP_NAME} would have been created and sent to ${BACKUP_POOL} if IS_TEST were set to 'false'. *(see $LOG_FILE for more details)*"
-    log_message "Info: Test run of ZFS ${SNAP_TYPE^} backup process complete for ${SOURCE_POOL} - Snapshot ${SNAP_NAME} would have been created and sent to ${BACKUP_POOL} if IS_TEST were set to 'false'. (see $LOG_FILE for more details)\n=========="
+    send_discord_notification ":white_check_mark::test_tube: **_Test_ run of ZFS ${SNAP_TYPE^} Backup Completed Successfully** - Snapshot ${SNAP_NAME} would have been created and sent to ${BACKUP_POOL} if IS_TEST were set to 'false'. *(see $LOG_FILE for more details)*"    
 fi
+
+# Add separator for log file for next run:
+log_message "End of ZFS Backup Process\n=========="
