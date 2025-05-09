@@ -257,8 +257,8 @@ zfs snapshot -r naspool@backup2
 zfs send -R -i naspool@backup naspool@backup2 | zfs receive -Fdu naspool_backup1
 
 # Examples:
-zfs send -R -i naspool@daily_backup_20250403 naspool@daily_backup_20250418 | zfs receive -Fdu naspool_backup1
-zfs send -R -i naspool@daily_backup_20250403 naspool@daily_backup_20250418 | zfs receive -Fdu naspool_backup2
+zfs send -R -i naspool@daily_backup_20250418 naspool@daily_backup_20250509 | zfs receive -Fdu naspool_backup1
+zfs send -R -i naspool@daily_backup_20250418 naspool@daily_backup_20250509 | zfs receive -Fdu naspool_backup2
 ```
 
 3. Delete old snapshots if needed:
