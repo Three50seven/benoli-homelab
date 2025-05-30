@@ -40,6 +40,8 @@ DISK_USAGE_LOG="/var/log/zfs_disk_usage.log"
 BACKUP_POOL="naspool_backup2"
 #$(zpool list -H -o name | grep -m1 "naspool_backup")
 
+# TODO:AFTER TESTING ON naspool2, DON'T FORGET TO CHANGE BACK THE BACKUP_POOL VARIABLE ABOVE
+
 # Discord Webhook URL (Replace with your actual webhook)
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 WEBHOOK_FILE="$SCRIPT_DIR/secrets/.zfs_backups_discord_webhook"
@@ -138,25 +140,16 @@ fi
 DATE=$(date +"%Y%m%d")
 SNAP_ENDING="${SNAP_TYPE}_backup_$DATE"
 SNAP_NAME="${SOURCE_POOL}@${SNAP_ENDING}"
-SNAP_HISTORY_FILE="snapshot_history_${BACKUP_POOL}.txt"
 
-# Ensure the history file exists
-if [ ! -f "$SNAP_HISTORY_FILE" ]; then
-    touch "$SNAP_HISTORY_FILE"
-    log_message "Info: Created history file: $SNAP_HISTORY_FILE"
-fi
-
-# Get the last snapshot entry for the specific backup type
-LAST_SNAP=$(grep "^$SNAP_TYPE" "$SNAP_HISTORY_FILE" | tail -n 1 | awk '{print $2}')
+# Get the Last Snapshot on source: Use zfs list to find the most recent snapshot.
+LAST_SNAP_SOURCE_POOL=$(zfs list -H -t snapshot -o name -S creation -r $SOURCE_POOL | head -n 1)
 
 # Display the last snapshot or notify if no entry found
-if [ -n "$LAST_SNAPSHOT" ]; then
-    log_message "Info: Last snapshot for $SNAP_TYPE backup: $LAST_SNAPSHOT"
+if [ -n "$LAST_SNAP_SOURCE_POOL" ]; then
+    log_message "Info: Last snapshot on source (${SOURCE_POOL}): $LAST_SNAP_SOURCE_POOL - New snapshot: $SNAP_NAME"
 else
     log_message "Info: No snapshot found for $SNAP_TYPE backup."
 fi
-
-log_message "Info: Last snapshot: $LAST_SNAP - New snapshot: $SNAP_NAME"
 
 # Create new snapshot based on retention settings for this type if one by the same name doesn't already exist
 if [ "$RETENTION_PERIOD" -ne 0 ]; then
@@ -165,13 +158,9 @@ if [ "$RETENTION_PERIOD" -ne 0 ]; then
     else
         if [ "$IS_TEST" = false ]; then
             zfs snapshot -r "$SNAP_NAME"
-            log_message "Info: Created $SNAP_TYPE snapshot: $SNAP_NAME"
-
-            # Add the snapshot to the history file:
-            echo "$SNAP_NAME" >> "$SNAP_HISTORY_FILE"
-            log_message "Info: Logged snapshot: $SNAP_NAME"
+            log_message "Info: Created $SNAP_TYPE snapshot: $SNAP_NAME"            
         else
-            log_message "Info: Skipping snapshot creation (${SNAP_NAME}) and logging to history file (${SNAP_HISTORY_FILE}) because IS_TEST is true."
+            log_message "Info: Skipping snapshot creation (${SNAP_NAME}) because IS_TEST is true."
         fi
     fi
 else
@@ -180,25 +169,47 @@ else
 fi
 
 # Check for Previous Snapshot: If a previous snapshot exists, send the incremental snapshot. Otherwise, perform a full send.
+LAST_SNAP_BACKUP_POOL=$(zfs list -H -t snapshot -o name -S creation -r $BACKUP_POOL | head -n 1)
+
+# Convert LAST_SNAP_BACKUP_POOL to reference SOURCE_POOL
+# for incremental sending, we need the latest snapshot from SOURCE_POOL that exists in BACKUP_POOL to ensure incremental send uses the correct lineage.            
+if [[ -n "$LAST_SNAP_BACKUP_POOL" ]]; then
+    LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP="${SOURCE_POOL}@$(echo "$LAST_SNAP_BACKUP_POOL" | cut -d'@' -f2)"
+    log_message "Info: Found previous snapshot in backup pool: $LAST_SNAP_BACKUP_POOL - Adjusted to source pool: $LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP"
+
+    # Verify the correct snapshot name - double-check that the converted snapshot exists in the source pool before attempting an incremental send
+    if zfs list -H -t snapshot -o name | grep -q "^$LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP"; then
+        log_message "Info: Snapshot $LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP exists in source pool, proceeding with incremental send."
+    else
+        log_message "Warning: Adjusted snapshot does not exist in source pool! Falling back to full send."
+        LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP=""
+    fi
+else
+    log_message "Warning: No prior snapshots found in backup pool. Defaulting to full send."
+    LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP=""  # Forces full send
+fi
+
+# Check for Previous Snapshot: If a previous snapshot exists, send the incremental snapshot. Otherwise, perform a full send.
 # Send incremental snapshots to backup pool if it doesn't already exist
 # Check if the snapshot already exists on the receiving pool
-if zfs list -H -t snapshot -o name | grep -q "$BACKUP_POOL@$SNAP_ENDING"; then
-    log_message "Info: Snapshot ${BACKUP_POOL}@${SNAP_ENDING} already exists on the backup pool: $BACKUP_POOL. Skipping send."
+if zfs list -H -t snapshot -o name | grep -q "^$SOURCE_POOL@$SNAP_ENDING" && \
+   zfs list -H -t snapshot -o name | grep -q "^$BACKUP_POOL@$SNAP_ENDING"; then
+    log_message "Info: Snapshot $SNAP_ENDING already exists in both pools (source pool: $SOURCE_POOL and backup pool: $BACKUP_POOL). Skipping send."    
 else    
-    if [ -n "$LAST_SNAP" ]; then
-        if [ "$IS_TEST" = false ]; then
-            log_message "Info: Sending incremental snapshot from $LAST_SNAP to $SNAP_NAME to backup pool: $BACKUP_POOL."
-            zfs send -R -I "$LAST_SNAP" "$SNAP_NAME" | zfs receive -Fdu "$BACKUP_POOL"
+    if [ -n "$LAST_SNAP_BACKUP_POOL" ]; then
+        if [ "$IS_TEST" = false ]; then            
+            log_message "Info: Sending incremental snapshot from $LAST_SNAP_BACKUP_POOL to $SNAP_NAME to backup pool: $BACKUP_POOL."
+            zfs send -R -I "$LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP" "$SNAP_NAME" | zfs receive -Fdu "$BACKUP_POOL"
             
             # Capture/Log the exit status of the zfs send command
             ZFS_SEND_EXIT_CODE=$?
-            if [ ZFS_SEND_EXIT_CODE -eq 0 ]; then
-                log_message "Info: Successfully sent incremental snapshot from $LAST_SNAP to $SNAP_NAME to backup pool: $BACKUP_POOL."
+            if [ $ZFS_SEND_EXIT_CODE -eq 0 ]; then
+                log_message "Info: Successfully sent incremental snapshot from $LAST_SNAP_BACKUP_POOL to $SNAP_NAME to backup pool: $BACKUP_POOL."
             else
-                log_message "Error: Failed to send incremental snapshot from $LAST_SNAP to $SNAP_NAME to backup pool: $BACKUP_POOL. ZFS_SEND_EXIT_CODE: $ZFS_SEND_EXIT_CODE"
+                log_message "Error: Failed to send incremental snapshot from $LAST_SNAP_BACKUP_POOL to $SNAP_NAME to backup pool: $BACKUP_POOL. ZFS_SEND_EXIT_CODE: $ZFS_SEND_EXIT_CODE"
             fi            
         else
-            log_message "Info: Skipping ZFS incremental send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP: $LAST_SNAP | SNAP_NAME: $SNAP_NAME"
+            log_message "Info: Skipping ZFS incremental send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP_BACKUP_POOL: $LAST_SNAP_BACKUP_POOL | SNAP_NAME: $SNAP_NAME"
         fi
     else
         if [ "$IS_TEST" = false ]; then
@@ -207,14 +218,14 @@ else
             
             # Capture/Log the exit status of the zfs send command
             ZFS_SEND_EXIT_CODE=$?
-            if [ ZFS_SEND_EXIT_CODE -eq 0 ]; then
+            if [ $ZFS_SEND_EXIT_CODE -eq 0 ]; then
                 log_message "Info: Successfully sent full snapshot $SNAP_NAME to backup pool: $BACKUP_POOL."
                             
             else
                 log_message "Error: Failed to send full snapshot $SNAP_NAME to backup pool: $BACKUP_POOL. ZFS_SEND_EXIT_CODE: $ZFS_SEND_EXIT_CODE"
             fi 
         else
-            log_message "Info: Skipping ZFS full send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP: $LAST_SNAP | SNAP_NAME: $SNAP_NAME"
+            log_message "Info: Skipping ZFS full send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP_BACKUP_POOL: $LAST_SNAP_BACKUP_POOL | SNAP_NAME: $SNAP_NAME"
         fi
     fi
 fi
@@ -226,6 +237,12 @@ log_message "Info: Checking retention period (${RETENTION_PERIOD}) and cleaning 
 cleanup_snapshots() {  
     local SNAP_COUNT=0
     local SNAP_LIMIT=$RETENTION_PERIOD
+
+    # Check if any snapshots match SNAP_TYPE, if none, skip cleanup
+    if ! zfs list -H -t snapshot -o name | grep -q "$SNAP_TYPE"; then
+        log_message "Warning: No snapshots found matching $SNAP_TYPE. Skipping snapshot cleanup."
+        return
+    fi
 
     # List and loop through the snapshots based on the SNAP_TYPE
     zfs list -H -t snapshot -o name,creation | grep "$SNAP_TYPE" | while read -r SNAP CREATION; do
@@ -249,15 +266,32 @@ cleanup_snapshots() {
     fi
 }
 
+# Log current snapshot count before cleanup
+SNAPSHOT_COUNT_BEFORE=$(zfs list -H -t snapshot | grep "$SNAP_TYPE" | wc -l)
+log_message "Info: $SNAPSHOT_COUNT_BEFORE $SNAP_TYPE snapshots exist before cleanup."
+
 # call the function to cleanup older snapshots based on retention period
 cleanup_snapshots
 
+# Log remaining snapshots after cleanup
+SNAPSHOT_COUNT_AFTER=$(zfs list -H -t snapshot | grep "$SNAP_TYPE" | wc -l)
+log_message "Info: Cleanup complete. $SNAPSHOT_COUNT_AFTER $SNAP_TYPE snapshots remain."
+
 # send message 
 if [ "$IS_TEST" = false ]; then
-    send_discord_notification ":white_check_mark: **ZFS ${SNAP_TYPE^} Backup Completed Successfully for ${SOURCE_POOL}** - Snapshot ${SNAP_NAME} sent to ${BACKUP_POOL}. *(see $LOG_FILE for more details)*"    
+    # Verify snapshot exists in backup pool
+    log_message "Info: Verifying snapshot $SNAP_ENDING in backup pool $BACKUP_POOL."
+    if zfs list -H -t snapshot -o name | grep -q "^$BACKUP_POOL@$SNAP_ENDING"; then
+        send_discord_notification ":white_check_mark: **ZFS ${SNAP_TYPE^} Backup Completed Successfully for ${SOURCE_POOL}** - Snapshot ${SNAP_NAME} verified as sent to ${BACKUP_POOL}. *(see $LOG_FILE for more details)*"    
+    else
+        send_discord_notification ":x: **ZFS Backup Error** - Snapshot $SNAP_ENDING did NOT arrive in $BACKUP_POOL!"
+        exit 1
+    fi    
 else
     send_discord_notification ":white_check_mark::test_tube: **_Test_ run of ZFS ${SNAP_TYPE^} Backup Completed Successfully** - Snapshot ${SNAP_NAME} would have been created and sent to ${BACKUP_POOL} if IS_TEST were set to 'false'. *(see $LOG_FILE for more details)*"    
 fi
+
+# TODO: Handle encrypting and sending with encryption
 
 # Add separator for log file for next run:
 log_message "End of ZFS Backup Process\n=========="
