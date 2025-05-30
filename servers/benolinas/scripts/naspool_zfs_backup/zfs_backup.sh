@@ -8,6 +8,14 @@
 # You can search for these and find them towards the bottom of the script, they should have the "IS_TEST" check around them too.
 # The remainder of the script is "fluff" and used for variable setup and function setup, as well as safety checks, duplicate checks, etc.
 
+# Example, to run script from terminal, for daily and keeping 7 days worth of snapshots, 
+#   navigate to or point to the location on the server and run with: bash zfs_backup.sh daily 7
+
+# NOTE: To make the script executable on Linux, make sure it's in Unix (LF) format'
+# If not, you'll see errors like this: line 2 $'\r': command not found
+# When opening this file, make sure bottom-right status in Notepad++ says Unix (LF)
+# If it indicates Windows CRLF, convert it => open NotePad++, click Edit, Hover over EOL Conversion and select Unix (LF)
+
 # Set the IS_TEST variable to true to run a test only 
 # When false, the ZFS commands will be executed. i.e. a snapshot will be made and sent to the backup pool, and old ones will be destroyed
 IS_TEST=true # Safety flag for running just a test without impacting the ZFS pools
@@ -130,29 +138,25 @@ fi
 DATE=$(date +"%Y%m%d")
 SNAP_ENDING="${SNAP_TYPE}_backup_$DATE"
 SNAP_NAME="${SOURCE_POOL}@${SNAP_ENDING}"
+SNAP_HISTORY_FILE="snapshot_history_${BACKUP_POOL}.txt"
 
-#1. Get the Last Snapshot: Use zfs list to find the most recent snapshot.
-#2. Check for Previous Snapshot: If a previous snapshot exists, send the incremental snapshot. Otherwise, perform a full send.
-LAST_SNAP=$(zfs list -H -t snapshot -o name -S creation | grep "^$SOURCE_POOL@$SNAP_TYPE" | head -n 1)
+# Ensure the history file exists
+if [ ! -f "$SNAP_HISTORY_FILE" ]; then
+    touch "$SNAP_HISTORY_FILE"
+    log_message "Info: Created history file: $SNAP_HISTORY_FILE"
+fi
+
+# Get the last snapshot entry for the specific backup type
+LAST_SNAP=$(grep "^$SNAP_TYPE" "$SNAP_HISTORY_FILE" | tail -n 1 | awk '{print $2}')
+
+# Display the last snapshot or notify if no entry found
+if [ -n "$LAST_SNAPSHOT" ]; then
+    log_message "Info: Last snapshot for $SNAP_TYPE backup: $LAST_SNAPSHOT"
+else
+    log_message "Info: No snapshot found for $SNAP_TYPE backup."
+fi
+
 log_message "Info: Last snapshot: $LAST_SNAP - New snapshot: $SNAP_NAME"
-
-
-
-# TODO: NEED TO GET THE LAST SNAP ON THE BACKUP POOL AND SET THE INCREMENTAL SOURCE TO THAT SNAPSHOT NAME
-# TODO: Do I need to keep a record of snapshots between the naspool and backup pool so that I don't delete the last snapshot that the backup pool has when it was ejected?
-# TODO: Yes, Setup txt file to keep track of which snapshots have been sent to the naspool_backup, name it the same as the backup, naming convention: snapshot_history_[backup_pool_name].txt, e.g.: snapshot_history_naspool_backup1.txt
-# OTHERWISE, GETTING ERRORS LIKE: 
-    Fri Mar 21 03:25:43 PM EDT 2025 - Info: Sending incremental snapshot from naspool@daily_backup_20250321 to naspool@daily_backup_20250321 to backup pool: naspool_backup2.
-    WARNING: could not send naspool@daily_backup_20250321:
-    incremental source (naspool@daily_backup_20250321) is not earlier than it
-    WARNING: could not send naspool/share@daily_backup_20250321:
-    incremental source (naspool/share@daily_backup_20250321) is not earlier than it
-    WARNING: could not send naspool/backups@daily_backup_20250321:
-    incremental source (naspool/backups@daily_backup_20250321) is not earlier than it
-# ALSO, AFTER TESTING ON naspool2, DON'T FORGET TO CHANGE BACK THE BACKUP_POOL VARIABLE ABOVE
-
-
-
 
 # Create new snapshot based on retention settings for this type if one by the same name doesn't already exist
 if [ "$RETENTION_PERIOD" -ne 0 ]; then
@@ -162,8 +166,12 @@ if [ "$RETENTION_PERIOD" -ne 0 ]; then
         if [ "$IS_TEST" = false ]; then
             zfs snapshot -r "$SNAP_NAME"
             log_message "Info: Created $SNAP_TYPE snapshot: $SNAP_NAME"
+
+            # Add the snapshot to the history file:
+            echo "$SNAP_NAME" >> "$SNAP_HISTORY_FILE"
+            log_message "Info: Logged snapshot: $SNAP_NAME"
         else
-            log_message "Info: Skipping snapshot creation (${SNAP_NAME}) because IS_TEST is true."
+            log_message "Info: Skipping snapshot creation (${SNAP_NAME}) and logging to history file (${SNAP_HISTORY_FILE}) because IS_TEST is true."
         fi
     fi
 else
@@ -171,6 +179,7 @@ else
     exit 1
 fi
 
+# Check for Previous Snapshot: If a previous snapshot exists, send the incremental snapshot. Otherwise, perform a full send.
 # Send incremental snapshots to backup pool if it doesn't already exist
 # Check if the snapshot already exists on the receiving pool
 if zfs list -H -t snapshot -o name | grep -q "$BACKUP_POOL@$SNAP_ENDING"; then
