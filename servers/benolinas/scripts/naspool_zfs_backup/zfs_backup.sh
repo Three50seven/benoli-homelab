@@ -48,34 +48,78 @@ ensure_log_files_exist() {
         if [[ ! -f "$path" ]]; then
             touch "$path"
             if [[ $? -ne 0 ]]; then
-                log_message "Error: Failed to create log file: $path—check permissions!"
+                echo "Error: Failed to create log file: $path—check permissions!"
                 exit 1
             else
-                log_message "Info: Created missing log file: $path"
+                echo "Info: Created missing log file: $path"
             fi
         fi
         if [[ ! -w "$path" ]]; then
-            log_message "Error: Log file $path exists but is not writable! Check permissions."
+            echo "Error: Log file $path exists but is not writable! Check permissions."
             exit 1
         fi
     done
 }
 
-ensure_log_files_exist
-
 # Function to log messages
 log_message() {
     local message="$1"
-    echo -e "$(date) - $message" | tee -a "$LOG_FILE"
+    echo -e "$(date +"$LOG_DATE_FORMAT") - $message" | tee -a "$LOG_FILE"
 }
+
+# Function to trim log files - manage their size and keep them from continuously growing
+trim_log_files() {
+    local LOG_FILES=("$LOG_FILE" "$DISK_USAGE_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG")
+
+    # Validate LOG_FILE_LINES_TO_KEEP to prevent errors
+    if ! echo "$LOG_FILE_LINES_TO_KEEP" | grep -qE '^[0-9]+$'; then
+        log_message "Error: LOG_FILE_LINES_TO_KEEP must be a valid number. Found: $LOG_FILE_LINES_TO_KEEP"
+        exit 1
+    fi
+
+    for LOCAL_LOG_FILE in "${LOG_FILES[@]}"; do
+        if [[ -f "$LOCAL_LOG_FILE" ]]; then
+            log_message "Info: Trimming $LOCAL_LOG_FILE to keep last $LOG_FILE_LINES_TO_KEEP lines."
+
+            # Create a temporary trimmed log file with a header indicating previous entries were removed
+            echo "$(date +"$LOG_DATE_FORMAT") - Info: Previous log entries trimmed to maintain file size." > "$LOCAL_LOG_FILE.tmp"
+
+            # Append the last N lines after the notice and handle errors
+            if ! tail -n "$LOG_FILE_LINES_TO_KEEP" "$LOCAL_LOG_FILE" >> "$LOCAL_LOG_FILE.tmp"; then
+                log_message "Error: Failed to retrieve log content from $LOCAL_LOG_FILE"
+                continue  # Skip replacement if tail fails
+            fi
+
+            # Replace original log file with the trimmed version
+            if mv "$LOCAL_LOG_FILE.tmp" "$LOCAL_LOG_FILE"; then
+                log_message "Info: Successfully trimmed $LOCAL_LOG_FILE"
+            else
+                log_message "Error: Failed to replace $LOCAL_LOG_FILE with trimmed version"
+            fi
+        else
+            log_message "Warning: Log file $LOCAL_LOG_FILE does not exist—skipping trim."
+        fi
+    done
+}
+
+echo "Info: Ensuring log files exist and are writable."
+ensure_log_files_exist
+
+LOG_DATE_FORMAT=${LOG_DATE_FORMAT:-"%Y-%m-%dT%H:%M:%S%z"}  # Default to ISO 8601
+
+# Validate LOG_DATE_FORMAT (must contain recognized format specifiers)
+if ! date +"$LOG_DATE_FORMAT" &>/dev/null; then
+    log_message "Warning: Invalid LOG_DATE_FORMAT detected. Falling back to ISO 8601."
+    LOG_DATE_FORMAT="%Y-%m-%dT%H:%M:%S%z"
+fi
 
 # Safety flag for running just a test without impacting the ZFS pools - only runs in "LIVE" mode when set to "false" in config - Default is true
 IS_TEST=true
 if [[ "$IS_TEST_STRING" == "false" ]]; then
-    log_message "Info: Running in LIVE mode—backup operations will proceed normally."
+    log_message "Info: Running in LIVE mode - backup operations will proceed normally."
     IS_TEST=false
 else
-    log_message "Info: Running in TEST mode—no destructive operations will be performed."
+    log_message "Info: Running in TEST mode - no destructive operations will be performed."
 fi
 
 # Detect the active backup pool
@@ -106,7 +150,29 @@ $(printf "| %-40s | %-35s |\n" "LOG_FILE" "$LOG_FILE")
 $(printf "| %-40s | %-35s |\n" "DISK_USAGE_LOG" "$DISK_USAGE_LOG")
 $(printf "| %-40s | %-35s |\n" "SNAPSHOT_TRANSFER_HISTORY_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG")
 $(printf "+-%-40s-+-%-35s-+\n" "$(printf '%0.s-' {1..40})" "$(printf '%0.s-' {1..35})")
+$(printf "| %-40s | %-35s |\n" "SKIP_LOG_FILE_MAINTENANCE" "$SKIP_LOG_FILE_MAINTENANCE")
+$(printf "| %-40s | %-35s |\n" "LOG_FILE_LINES_TO_KEEP" "$LOG_FILE_LINES_TO_KEEP")
+$(printf "| %-40s | %-35s |\n" "LOG_DATE_FORMAT" "$LOG_DATE_FORMAT")
 "
+
+# Check log maintenance variables only if maintenance is done/needed
+if [[ "$SKIP_LOG_FILE_MAINTENANCE" == "false" ]] then
+    MIN_LOG_LINES=100  # Minimum log lines allowed
+    MAX_LOG_LINES=50000  # Maximum log lines allowed
+
+    if ! echo "$LOG_FILE_LINES_TO_KEEP" | grep -qE '^[0-9]+$'; then
+        log_message "Error: LOG_FILE_LINES_TO_KEEP must be numeric. Found: $LOG_FILE_LINES_TO_KEEP"
+        exit 1
+    elif (( LOG_FILE_LINES_TO_KEEP < MIN_LOG_LINES || LOG_FILE_LINES_TO_KEEP > MAX_LOG_LINES )); then
+        log_message "Error: LOG_FILE_LINES_TO_KEEP ($LOG_FILE_LINES_TO_KEEP) must be between $MIN_LOG_LINES and $MAX_LOG_LINES."
+        exit 1
+    fi
+
+    log_message "Info: Running log file maintenance."
+    trim_log_files
+else
+    log_message "Info: Skipping log file maintenance."
+fi
 
 # Attempt to Read webhook URL from the file specified in the variable
 if [[ -f "$WEBHOOK_FILE" ]]; then
@@ -208,8 +274,8 @@ if ! echo "$FREE_SPACE_GB" | grep -qE '^[0-9]+(\.[0-9]+)?$'; then
 fi
 
 # Log disk usage to separte file for helping to plot usage over time
-echo "$(date), $BACKUP_POOL, ${FREE_SPACE_GB}GB free" | tee -a $DISK_USAGE_LOG
-echo "$(date), $SOURCE_POOL, ${FREE_SPACE_GB_SOURCE_POOL}GB free" | tee -a $DISK_USAGE_LOG
+echo "$(date +"$LOG_DATE_FORMAT"), $BACKUP_POOL, ${FREE_SPACE_GB}GB free" | tee -a $DISK_USAGE_LOG
+echo "$(date +"$LOG_DATE_FORMAT"), $SOURCE_POOL, ${FREE_SPACE_GB_SOURCE_POOL}GB free" | tee -a $DISK_USAGE_LOG
 log_message "Info: Backup ZFS Pool: $BACKUP_POOL has ${FREE_SPACE_GB}GB free - also see $DISK_USAGE_LOG for CSV list to help plot out usage over time"
 log_message "Info: Source ZFS Pool: $SOURCE_POOL has ${FREE_SPACE_GB_SOURCE_POOL}GB free - also see $DISK_USAGE_LOG for CSV list to help plot out usage over time"
 
@@ -231,7 +297,7 @@ if (( $(echo "$FREE_SPACE_GB_SOURCE_POOL < $SOURCE_POOL_CRITICAL_THRESHOLD" | bc
     exit 1
 fi
 
-# Get today's date
+# Get today's date for snapshot name
 DATE=$(date +"%Y%m%d")
 SNAP_ENDING="${SNAP_TYPE}_backup_$DATE"
 SNAP_NAME="${SOURCE_POOL}@${SNAP_ENDING}"
@@ -257,7 +323,7 @@ log_existing_snapshots() {
 
     zfs list -H -t snapshot -o name "$POOL" | while IFS= read -r SNAPSHOT; do
         if ! grep -q "$SNAPSHOT $POOL" "$SNAPSHOT_TRANSFER_HISTORY_LOG"; then
-            echo -e "$SNAPSHOT $POOL $(date +'%Y-%m-%d %H:%M:%S')" | tee -a "$SNAPSHOT_TRANSFER_HISTORY_LOG"
+            echo -e "$SNAPSHOT $POOL $(date +"$LOG_DATE_FORMAT")" | tee -a "$SNAPSHOT_TRANSFER_HISTORY_LOG"
             log_message "Info: Adding previously transferred snapshot to log: $SNAPSHOT"
         fi
     done
@@ -266,7 +332,7 @@ log_existing_snapshots() {
 log_snapshot_transfer() {
     local SNAP_NAME=$1
     local POOL=$2
-    echo -e "$SNAP_NAME $POOL $(date +'%Y-%m-%d %H:%M:%S')" | tee -a "$SNAPSHOT_TRANSFER_HISTORY_LOG"
+    echo -e "$SNAP_NAME $POOL $(date +"$LOG_DATE_FORMAT")" | tee -a "$SNAPSHOT_TRANSFER_HISTORY_LOG"
 }
 
 snapshot_sent_to_all_pools() {
@@ -281,6 +347,9 @@ snapshot_sent_to_all_pools() {
 
     return 0 # Success: safe to delete
 }
+
+# Breaker for actual ZFS manipulation and Snapshot processing that follows
+log_message "Info: Set up and pre-checks complete - Continuing ZFS Backup."
 
 # Create new snapshot based on retention settings for this type if one by the same name doesn't already exist
 if [ "$RETENTION_PERIOD" -ne 0 ]; then
