@@ -94,7 +94,7 @@ log_message "Info: Starting ZFS $SNAP_TYPE backup on $(hostname) - Variables:
     \n\tIS_TEST: $IS_TEST    
     \n\tSOURCE_POOL: $SOURCE_POOL
     \n\tBACKUP_POOL: $BACKUP_POOL
-    \n\tREQUIRED_POOLS: ${REQUIRED_POOLS[@]}
+    \n\tREQUIRED_POOLS: $(printf "%s " "${REQUIRED_POOLS[@]}")
     \n\tBACKUP_POOL_SIZE_WARNING_THRESHOLD (GB): $BACKUP_POOL_SIZE_WARNING_THRESHOLD
     \n\tBACKUP_POOL_CRITICAL_THRESHOLD (GB): $BACKUP_POOL_CRITICAL_THRESHOLD
     \n\tSOURCE_POOL_SIZE_WARNING_THRESHOLD (GB): $SOURCE_POOL_SIZE_WARNING_THRESHOLD
@@ -186,16 +186,15 @@ if ! zpool list | grep -q "$BACKUP_POOL"; then
     exit 1
 fi
 
-FREE_SPACE_GB=$(zfs list -H -o available $BACKUP_POOL | numfmt --from=iec | awk '{print $1 / 1073741824}')
 FREE_SPACE_GB_SOURCE_POOL=$(zfs list -H -o available $SOURCE_POOL | numfmt --from=iec | awk '{print $1 / 1073741824}')
+FREE_SPACE_GB=$(zfs list -H -o available $BACKUP_POOL | numfmt --from=iec | awk '{print $1 / 1073741824}')
 
-if [[ ! "$FREE_SPACE_GB" =~ ^[0-9]+$ ]]; then
-    log_message "Error: Failed to retrieve valid free space data for backup pool: $BACKUP_POOL."
+if ! echo "$FREE_SPACE_GB_SOURCE_POOL" | grep -qE '^[0-9]+(\.[0-9]+)?$'; then
+    log_message "Error: Failed to retrieve valid free space data for source pool: $SOURCE_POOL."
     exit 1
 fi
-
-if [[ ! "$FREE_SPACE_GB_SOURCE_POOL" =~ ^[0-9]+$ ]]; then
-    log_message "Error: Failed to retrieve valid free space data for source pool: $SOURCE_POOL."
+if ! echo "$FREE_SPACE_GB" | grep -qE '^[0-9]+(\.[0-9]+)?$'; then
+    log_message "Error: Failed to retrieve valid free space data for backup pool: $BACKUP_POOL."
     exit 1
 fi
 
@@ -356,9 +355,6 @@ else
     fi
 fi
 
-# Cleanup old snapshots
-log_message "Info: Checking retention period (${RETENTION_PERIOD}) and cleaning up older snapshots."
-
 # TODO: TEST THIS!
 cleanup_snapshots() {  
     local SNAP_COUNT=0
@@ -383,7 +379,7 @@ cleanup_snapshots() {
 
             # Ensure cleanup only removes excess snapshots while keeping the required amount
             if (( TOTAL_SNAPSHOTS - SNAP_COUNT <= SNAP_LIMIT )); then
-                log_message "Info: Retention policy met—stopping cleanup in $POOL (keeping $SNAP_LIMIT snapshots)"
+                log_message "Info: Retention policy met - stopping cleanup in $POOL (keeping $SNAP_LIMIT snapshots)"
                 break
             fi
 
@@ -432,7 +428,8 @@ done
 SNAPSHOT_COUNT_BEFORE=$(zfs list -H -t snapshot -o name | grep "$SNAP_TYPE" | wc -l)
 log_message "Info: $SNAPSHOT_COUNT_BEFORE $SNAP_TYPE snapshots exist before cleanup."
 
-# call the function to cleanup older snapshots based on retention period
+# Cleanup old snapshots - call the function to cleanup older snapshots based on retention period
+log_message "Info: Checking retention period (${RETENTION_PERIOD}) and cleaning up older snapshots."
 cleanup_snapshots
 
 # Log remaining snapshots after cleanup
