@@ -9,7 +9,8 @@
 # The remainder of the script is "fluff" and used for variable setup and function setup, as well as safety checks, duplicate checks, etc.
 
 # Example, to run script from terminal, for daily and keeping 7 days worth of snapshots, 
-#   navigate to or point to the location on the server and run with: bash zfs_backup.sh daily 7
+#   navigate to or point to the location on the server and run with: 
+#   bash zfs_backup.sh daily 7
 
 # NOTE: To make the script executable on Linux, make sure it's in Unix (LF) format'
 # If not, you'll see errors like this: line 2 $'\r': command not found
@@ -19,20 +20,20 @@
 # Load config file
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 CONFIG_FILE="$SCRIPT_DIR/zfs_backup_settings.conf"
-if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-else
-    echo "Error: Config file $CONFIG_FILE not found!"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "Error: Config file $CONFIG_FILE not found. Exiting script."
     exit 1
 fi
 
-IS_TEST=true # Safety flag for running just a test without impacting the ZFS pools
-if [[ "$IS_TEST_STRING" == "false" ]]; then
-    log_message "Info: Running in LIVE mode—backup operations will proceed normally."
-    IS_TEST=false
-else    
-    log_message "Info: Running in TEST mode—no destructive operations will be performed."    
+# Config file readability check
+if [[ ! -r "$CONFIG_FILE" ]]; then
+    echo "Error: Config file $CONFIG_FILE exists but cannot be read. Exiting script."
+    exit 1
 fi
+
+echo "Info: Sourcing variables from config file after checking if it exists and is readable:"
+source "$CONFIG_FILE"
 
 # Get the snapshot type - this will be sent from the Cron job
 # Valid options are: daily|weekly|monthly|yearly
@@ -43,46 +44,24 @@ SNAP_TYPE="$1"
 RETENTION_PERIOD="$2"
 
 ensure_log_files_exist() {
-    for file in "$LOG_FILE" "$DISK_USAGE_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG"; do
-        if [[ ! -f "$file" ]]; then
-            touch "$file"
-            log_message "Info: Created missing log file: $file"
+    for path in "$LOG_FILE" "$DISK_USAGE_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG"; do
+        if [[ ! -f "$path" ]]; then
+            touch "$path"
+            if [[ $? -ne 0 ]]; then
+                log_message "Error: Failed to create log file: $path—check permissions!"
+                exit 1
+            else
+                log_message "Info: Created missing log file: $path"
+            fi
+        fi
+        if [[ ! -w "$path" ]]; then
+            log_message "Error: Log file $path exists but is not writable! Check permissions."
+            exit 1
         fi
     done
 }
 
 ensure_log_files_exist
-
-# Detect the active backup pool
-BACKUP_POOL="naspool_backup2"
-#$(zpool list -H -o name | grep -m1 "naspool_backup")
-
-# TODO:AFTER TESTING ON naspool2, DON'T FORGET TO CHANGE BACK THE BACKUP_POOL VARIABLE ABOVE
-
-# Stop the backup if SOURCE_POOL is blank or the ZFS pool is offline
-if [[ -z "$SOURCE_POOL" ]]; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** SOURCE_POOL variable is blank — ZFS backup aborted!"
-    exit 1
-fi
-
-if ! zpool list | grep -q "$SOURCE_POOL"; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** Source Pool ($SOURCE_POOL) is offline — ZFS backup aborted!"
-    exit 1
-fi
-
-# Stop the backup if the BACKUP_POOL is blank or the ZFS pool is offline:
-if [[ -z "$BACKUP_POOL" ]]; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** BACKUP_POOL variable is blank — ZFS backup aborted!"
-    exit 1
-fi
-
-if ! zpool list | grep -q "$BACKUP_POOL"; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** Backup Pool ($BACKUP_POOL) is offline — ZFS backup aborted!"
-    exit 1
-fi
-
-# Discord Webhook URL (Replace with your actual webhook)
-WEBHOOK_FILE="$SCRIPT_DIR/secrets/.zfs_backups_discord_webhook"
 
 # Function to log messages
 log_message() {
@@ -90,11 +69,29 @@ log_message() {
     echo -e "$(date) - $message" | tee -a "$LOG_FILE"
 }
 
+# Safety flag for running just a test without impacting the ZFS pools - only runs in "LIVE" mode when set to "false" in config - Default is true
+IS_TEST=true
+if [[ "$IS_TEST_STRING" == "false" ]]; then
+    log_message "Info: Running in LIVE mode—backup operations will proceed normally."
+    IS_TEST=false
+else
+    log_message "Info: Running in TEST mode—no destructive operations will be performed."
+fi
+
+# Detect the active backup pool
+BACKUP_POOL="naspool_backup2"
+# BACKUP_POOL=$(zpool list -H -o name | grep -m1 "naspool_backup")
+# TODO:AFTER TESTING ON naspool2, DON'T FORGET TO CHANGE BACK THE BACKUP_POOL VARIABLE ABOVE
+
+# Discord Webhook URL (Replace with your actual webhook)
+WEBHOOK_FILE="$SCRIPT_DIR/secrets/.zfs_backups_discord_webhook"
+
 # Log start of backup and do some preliminary checks
 log_message "Info: Starting ZFS $SNAP_TYPE backup on $(hostname) - Variables:
     \n\tSNAP_TYPE: $SNAP_TYPE
     \n\tRETENTION_PERIOD: $RETENTION_PERIOD
-    \n\tIS_TEST: $IS_TEST
+    \n\tIS_TEST_STRING: $IS_TEST_STRING
+    \n\tIS_TEST: $IS_TEST    
     \n\tSOURCE_POOL: $SOURCE_POOL
     \n\tBACKUP_POOL: $BACKUP_POOL
     \n\tREQUIRED_POOLS: ${REQUIRED_POOLS[@]}
@@ -130,6 +127,7 @@ else
 fi
 
 # Function to send a Discord notification - note this will also log the message, so no need to call both the log and send functions
+# Note: when adding any new markdown (used by Discord), make sure it's replaced in the function for cleaner logging
 send_discord_notification() {
     local message=$1
 
@@ -157,7 +155,7 @@ send_discord_notification() {
     # Extract bold title (text inside the first set of bold markdown **...**)
     local message_title=$(echo "$message" | grep -o '\*\*[^*]*\*\*' | sed 's/\*\*//g')
 
-    # Construct JSON payload for Discord webhook
+    # Construct JSON payload for Discord webhook - using embedded JSON for more customization (like changing colors)
     local embed_json=$(jq -n \
         --arg title "$message_title" \
         --arg desc "$message" \
@@ -168,14 +166,38 @@ send_discord_notification() {
     curl -H "Content-Type: application/json" -X POST -d "$embed_json" "$DISCORD_WEBHOOK_URL"
 }
 
-# Check if backup pool is found
-if [ -z "$BACKUP_POOL" ]; then
-    send_discord_notification ":x: **ZFS Pool Backup Failed** No backup pool detected!"
+# Stop the backup if SOURCE_POOL is blank or the ZFS pool is offline
+if [[ -z "$SOURCE_POOL" ]]; then
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** SOURCE_POOL variable is blank — ZFS backup aborted!"
+    exit 1
+fi
+if ! zpool list | grep -q "$SOURCE_POOL"; then
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** Source Pool ($SOURCE_POOL) is offline — ZFS backup aborted!"
+    exit 1
+fi
+
+# Stop the backup if the BACKUP_POOL is blank or the ZFS pool is offline:
+if [[ -z "$BACKUP_POOL" ]]; then
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** BACKUP_POOL variable is blank — ZFS backup aborted!"
+    exit 1
+fi
+if ! zpool list | grep -q "$BACKUP_POOL"; then
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** Backup Pool ($BACKUP_POOL) is offline — ZFS backup aborted!"
     exit 1
 fi
 
 FREE_SPACE_GB=$(zfs list -H -o available $BACKUP_POOL | numfmt --from=iec | awk '{print $1 / 1073741824}')
 FREE_SPACE_GB_SOURCE_POOL=$(zfs list -H -o available $SOURCE_POOL | numfmt --from=iec | awk '{print $1 / 1073741824}')
+
+if [[ ! "$FREE_SPACE_GB" =~ ^[0-9]+$ ]]; then
+    log_message "Error: Failed to retrieve valid free space data for backup pool: $BACKUP_POOL."
+    exit 1
+fi
+
+if [[ ! "$FREE_SPACE_GB_SOURCE_POOL" =~ ^[0-9]+$ ]]; then
+    log_message "Error: Failed to retrieve valid free space data for source pool: $SOURCE_POOL."
+    exit 1
+fi
 
 # Log disk usage to separte file for helping to plot usage over time
 echo "$(date), $BACKUP_POOL, ${FREE_SPACE_GB}GB free" | tee -a $DISK_USAGE_LOG
@@ -312,6 +334,7 @@ else
             fi            
         else
             log_message "Info: Skipping ZFS incremental send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP_BACKUP_POOL: $LAST_SNAP_BACKUP_POOL | SNAP_NAME: $SNAP_NAME"
+            log_message "Info: Here's the command if running in 'LIVE' mode: zfs send -R -I ${LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP} ${SNAP_NAME} | zfs receive -Fdu ${BACKUP_POOL}"
         fi
     else
         if [ "$IS_TEST" = false ]; then
@@ -328,6 +351,7 @@ else
             fi 
         else
             log_message "Info: Skipping ZFS full send to $BACKUP_POOL because IS_TEST is true. LAST_SNAP_BACKUP_POOL: $LAST_SNAP_BACKUP_POOL | SNAP_NAME: $SNAP_NAME"
+            log_message "Info: Here's the command if running in 'LIVE' mode: zfs send -R ${SNAP_NAME} | zfs receive -Fdu ${BACKUP_POOL}"
         fi
     fi
 fi
@@ -342,10 +366,8 @@ cleanup_snapshots() {
     local MINIMUM_SNAPSHOTS=1
 
     for POOL in "${REQUIRED_POOLS[@]}"; do
-        # Check if the pool is available
         if ! zpool list | grep -q "$POOL"; then
-            log_message "Warning: Pool $POOL is offline—skipping cleanup!"
-            continue
+            log_message "Warning: Pool $POOL is offline—will use historical logs for validation."
         fi
 
         SNAPSHOT_COUNT=$(zfs list -H -t snapshot -o name "$POOL" | grep "$SNAP_TYPE" | wc -l)
@@ -355,35 +377,44 @@ cleanup_snapshots() {
             continue
         fi
 
-        zfs list -H -t snapshot -o name,creation | grep "$POOL/$SNAP_TYPE" | sort -k2 | while read -r SNAP CREATION; do
-            if (( SNAP_COUNT >= SNAP_LIMIT )); then
+        # Process snapshot cleanup
+        zfs list -H -t snapshot -o name,creation "$POOL" | grep "$SNAP_TYPE" | sort -k2 | while read -r SNAP CREATION; do
+            TOTAL_SNAPSHOTS=$(zfs list -H -t snapshot -o name "$POOL" | grep "$SNAP_TYPE" | wc -l)
+
+            # Ensure cleanup only removes excess snapshots while keeping the required amount
+            if (( TOTAL_SNAPSHOTS - SNAP_COUNT <= SNAP_LIMIT )); then
+                log_message "Info: Retention policy met—stopping cleanup in $POOL (keeping $SNAP_LIMIT snapshots)"
                 break
             fi
 
-            # Validate snapshot exists in backup before deletion
-            if ! zfs list -H -t snapshot -o name "$BACKUP_POOL" | grep -q "$SNAP"; then
-                log_message "Error: Snapshot $SNAP not found in backup pool—skipping deletion!"
-                continue
-            fi
-
-            if [ "$IS_TEST" = false ]; then
-                if snapshot_sent_to_all_pools "$SNAP"; then
-                    log_message "Info: Safe to delete snapshot $SNAP."
-                    zfs destroy -r "$SNAP"
-                else
-                    log_message "Warning: Keeping $SNAP—backup confirmation missing!"
+            # Ensure snapshot exists in *all* backup pools
+            local safe_to_delete=true
+            for BACKUP_POOL in "${REQUIRED_POOLS[@]}"; do
+                if ! zfs list -H -t snapshot -o name "$BACKUP_POOL" | grep -q "$SNAP"; then
+                    log_message "Warning: $SNAP is missing from $BACKUP_POOL—skipping deletion!"
+                    safe_to_delete=false
+                    break
                 fi
+            done
 
-                log_message "Info: Destroying snapshot $SNAP and dependencies."
-                zfs destroy -r "$SNAP"
+            # Final deletion logic
+            if [[ "$safe_to_delete" == true && $(snapshot_sent_to_all_pools "$SNAP") == true ]]; then
+                log_message "Info: Safe to delete snapshot $SNAP."
+                if [[ "$IS_TEST" == false ]]; then
+                    zfs destroy -r "$SNAP"
+                    log_message "Info: Snapshot $SNAP destroyed—record retained in history log ($SNAPSHOT_TRANSFER_HISTORY_LOG)."
+                else
+                    log_message "Info: Skipping deletion (IS_TEST=true): Would have destroyed: $SNAP"
+                fi
             else
-                log_message "Info: Skipping deletion (IS_TEST=true): Would have destroyed: $SNAP"
-            fi
-            
+                log_message "Warning: Retaining $SNAP due to incomplete backup validation!"
+            fi            
+
             ((SNAP_COUNT++))
         done
     done
 
+    # Send notification based on results
     if (( SNAP_COUNT == 0 )); then
         send_discord_notification "Info: **Snapshot Cleanup Complete** No snapshots found for cleanup."
     else
