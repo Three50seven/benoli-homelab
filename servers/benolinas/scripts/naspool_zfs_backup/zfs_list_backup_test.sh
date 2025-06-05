@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 
 # ZFS Backup TEST Script with Disk Space Monitoring, Logging, Retention Period & Discord Notifications
+# Use this script for testing isolated functions, formatting, and other programming away from the main script or worry of doing any desctructive changes to the ZFS pool
 
 # Set the source pool
 SOURCE_POOL="naspool"
