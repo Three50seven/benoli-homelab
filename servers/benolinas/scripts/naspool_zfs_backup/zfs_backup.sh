@@ -79,30 +79,34 @@ else
 fi
 
 # Detect the active backup pool
-BACKUP_POOL="naspool_backup2"
-# BACKUP_POOL=$(zpool list -H -o name | grep -m1 "naspool_backup")
-# TODO:AFTER TESTING ON naspool2, DON'T FORGET TO CHANGE BACK THE BACKUP_POOL VARIABLE ABOVE
+BACKUP_POOL=$(zpool list -H -o name | grep -m1 "naspool_backup")
 
 # Discord Webhook URL (Replace with your actual webhook)
 WEBHOOK_FILE="$SCRIPT_DIR/secrets/.zfs_backups_discord_webhook"
 
 # Log start of backup and do some preliminary checks
-log_message "Info: Starting ZFS $SNAP_TYPE backup on $(hostname) - Variables:
-    \n\tSNAP_TYPE: $SNAP_TYPE
-    \n\tRETENTION_PERIOD: $RETENTION_PERIOD
-    \n\tIS_TEST_STRING: $IS_TEST_STRING
-    \n\tIS_TEST: $IS_TEST    
-    \n\tSOURCE_POOL: $SOURCE_POOL
-    \n\tBACKUP_POOL: $BACKUP_POOL
-    \n\tREQUIRED_POOLS: $(printf "%s " "${REQUIRED_POOLS[@]}")
-    \n\tBACKUP_POOL_SIZE_WARNING_THRESHOLD (GB): $BACKUP_POOL_SIZE_WARNING_THRESHOLD
-    \n\tBACKUP_POOL_CRITICAL_THRESHOLD (GB): $BACKUP_POOL_CRITICAL_THRESHOLD
-    \n\tSOURCE_POOL_SIZE_WARNING_THRESHOLD (GB): $SOURCE_POOL_SIZE_WARNING_THRESHOLD
-    \n\tSOURCE_POOL_CRITICAL_THRESHOLD (GB): $SOURCE_POOL_CRITICAL_THRESHOLD
-    \n\tWEBHOOK_FILE: $WEBHOOK_FILE
-    \n\tLOG_FILE: $LOG_FILE
-    \n\tDISK_USAGE_LOG: $DISK_USAGE_LOG
-    \n\tSNAPSHOT_TRANSFER_HISTORY_LOG: $SNAPSHOT_TRANSFER_HISTORY_LOG"
+log_message "Info: Starting ZFS $SNAP_TYPE backup on $(hostname)
+
+$(printf "+-%-40s-+-%-35s-+\n" "$(printf '%0.s-' {1..40})" "$(printf '%0.s-' {1..35})")
+$(printf "| %-40s | %-35s |\n" "Variable" "Value")
+$(printf "+-%-40s-+-%-35s-+\n" "$(printf '%0.s-' {1..40})" "$(printf '%0.s-' {1..35})")
+$(printf "| %-40s | %-35s |\n" "SNAP_TYPE" "$SNAP_TYPE")
+$(printf "| %-40s | %-35s |\n" "RETENTION_PERIOD" "$RETENTION_PERIOD")
+$(printf "| %-40s | %-35s |\n" "IS_TEST_STRING" "$IS_TEST_STRING")
+$(printf "| %-40s | %-35s |\n" "IS_TEST" "$IS_TEST")
+$(printf "| %-40s | %-35s |\n" "SOURCE_POOL" "$SOURCE_POOL")
+$(printf "| %-40s | %-35s |\n" "BACKUP_POOL" "$BACKUP_POOL")
+$(printf "| %-40s | %-35s |\n" "REQUIRED_POOLS" "$(printf "%s, " "${REQUIRED_POOLS[@]}")")
+$(printf "| %-40s | %-35s |\n" "BACKUP_POOL_SIZE_WARNING_THRESHOLD (GB)" "$BACKUP_POOL_SIZE_WARNING_THRESHOLD")
+$(printf "| %-40s | %-35s |\n" "BACKUP_POOL_CRITICAL_THRESHOLD (GB)" "$BACKUP_POOL_CRITICAL_THRESHOLD")
+$(printf "| %-40s | %-35s |\n" "SOURCE_POOL_SIZE_WARNING_THRESHOLD (GB)" "$SOURCE_POOL_SIZE_WARNING_THRESHOLD")
+$(printf "| %-40s | %-35s |\n" "SOURCE_POOL_CRITICAL_THRESHOLD (GB)" "$SOURCE_POOL_CRITICAL_THRESHOLD")
+$(printf "| %-40s | %-35s |\n" "WEBHOOK_FILE" "$WEBHOOK_FILE")
+$(printf "| %-40s | %-35s |\n" "LOG_FILE" "$LOG_FILE")
+$(printf "| %-40s | %-35s |\n" "DISK_USAGE_LOG" "$DISK_USAGE_LOG")
+$(printf "| %-40s | %-35s |\n" "SNAPSHOT_TRANSFER_HISTORY_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG")
+$(printf "+-%-40s-+-%-35s-+\n" "$(printf '%0.s-' {1..40})" "$(printf '%0.s-' {1..35})")
+"
 
 # Attempt to Read webhook URL from the file specified in the variable
 if [[ -f "$WEBHOOK_FILE" ]]; then
@@ -185,6 +189,11 @@ if ! zpool list | grep -q "$BACKUP_POOL"; then
     send_discord_notification ":x: **ZFS Pool Backup Aborted** Backup Pool ($BACKUP_POOL) is offline — ZFS backup aborted!"
     exit 1
 fi
+
+# Show pool and dataset sizes before new snapshot is sent to backup:
+log_message "Info: Getting pool and dataset sizes before new snapshot is sent to backup:
+$(zfs list -r -o name,used,available "$SOURCE_POOL" | column -t)
+$(zfs list -r -o name,used,available "$BACKUP_POOL" | column -t)"
 
 FREE_SPACE_GB_SOURCE_POOL=$(zfs list -H -o available $SOURCE_POOL | numfmt --from=iec | awk '{print $1 / 1073741824}')
 FREE_SPACE_GB=$(zfs list -H -o available $BACKUP_POOL | numfmt --from=iec | awk '{print $1 / 1073741824}')
@@ -367,6 +376,8 @@ cleanup_snapshots() {
         fi
 
         SNAPSHOT_COUNT=$(zfs list -H -t snapshot -o name "$POOL" | grep "$SNAP_TYPE" | wc -l)
+
+        log_message "Info: $SNAPSHOT_COUNT $SNAP_TYPE snapshots exist for ZFS pool $POOL before cleanup."
         
         if (( SNAPSHOT_COUNT <= MINIMUM_SNAPSHOTS )); then
             log_message "Warning: Skipping cleanup in $POOL—only $SNAPSHOT_COUNT snapshot(s) left!"
@@ -408,6 +419,9 @@ cleanup_snapshots() {
 
             ((SNAP_COUNT++))
         done
+
+        SNAPSHOT_COUNT=$(zfs list -H -t snapshot -o name "$POOL" | grep "$SNAP_TYPE" | wc -l)
+        log_message "Info: $SNAPSHOT_COUNT $SNAP_TYPE snapshots exist for ZFS pool $POOL after cleanup."
     done
 
     # Send notification based on results
@@ -424,17 +438,14 @@ for POOL in "${REQUIRED_POOLS[@]}"; do
     log_existing_snapshots $POOL
 done
 
-# Log current snapshot count before cleanup
-SNAPSHOT_COUNT_BEFORE=$(zfs list -H -t snapshot -o name | grep "$SNAP_TYPE" | wc -l)
-log_message "Info: $SNAPSHOT_COUNT_BEFORE $SNAP_TYPE snapshots exist before cleanup."
-
 # Cleanup old snapshots - call the function to cleanup older snapshots based on retention period
 log_message "Info: Checking retention period (${RETENTION_PERIOD}) and cleaning up older snapshots."
 cleanup_snapshots
 
-# Log remaining snapshots after cleanup
-SNAPSHOT_COUNT_BEFORE=$(zfs list -H -t snapshot -o name | grep "$SNAP_TYPE" | wc -l)
-log_message "Info: Cleanup complete. $SNAPSHOT_COUNT_AFTER $SNAP_TYPE snapshots remain."
+# Show pool and dataset sizes after new snapshot is sent to backup:
+log_message "Info: Getting pool and dataset sizes after new snapshot is sent to backup:
+$(zfs list -r -o name,used,available "$SOURCE_POOL" | column -t)
+$(zfs list -r -o name,used,available "$BACKUP_POOL" | column -t)"
 
 # send message 
 if [ "$IS_TEST" = false ]; then
