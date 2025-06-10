@@ -61,13 +61,17 @@ https://dannyda.com/2020/05/17/how-to-remove-you-do-not-have-a-valid-subscriptio
 ```
 apt install nfs-kernel-Server
 ```
-- export the zfs filesystem by adding the following line to /etc/exports
-/naspool/share 192.168.1.0/24(rw,sync,no_subtree_check)
+- export the zfs filesystem by adding the following line to /etc/exports 
+- no_root_squash allows Docker client to add additional users as needed to the share and take ownership of specific directories that should only be used by a specific service
+/naspool/share 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
 
 - Apply the Export:
 ```
 exportfs -a
 systemctl restart nfs-kernel-server
+
+# Verify the mount options:
+mount | grep naspool
 ```
 
 ==========================
@@ -84,7 +88,9 @@ adduser nasbackup
 
 - Enter a password when prompted and verify by typing password again
 - Edit SSH config to allow user to connect:
+```
 nano /etc/ssh/sshd_config
+```
 
 # Add "newuser" to the "AllowUsers"
 - Add line under "Authentication" section in format (AllowUsers username1 username2 etc.)
