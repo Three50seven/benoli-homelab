@@ -16,11 +16,11 @@ CPU: 8 x Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz (1 Socket
 RAM: 32GB DDR4 Speed 2133 MHz
 
 # Create ZFS Pool with remaining diskspace:
-## See ...\Dropbox\Main\HomeServers\linux-notes\partition-storage-device-linux.md for notes on using the rest of the partition not used by the root file system of Proxmox
+## See [partition-storage-device-linux.md](https://github.com/Three50seven/benoli-homelab/blob/main/linux-notes/partition-storage-device-linux.md) for notes on using the rest of the partition not used by the root file system of Proxmox
 ## Run Command to view free space and disk usage stats in human readable format - note the "Type", you should see ZFS pools that can be imported
 df -Th
 
-# See ...\Dropbox\Main\HomeServers\linux-notes\zfs-file-system-notes.md FOR MORE ZFS POOL COMMANDS, SPECIFICALLY NOTES ABOUT IMPORTING POOL FROM PREV. SYSTEM IF THIS IS A REINSTALL OF PROXMOX:
+# See [partition-storage-device-linux.md](https://github.com/Three50seven/benoli-homelab/blob/main/linux-notes/zfs-file-system-notes.md) FOR MORE ZFS POOL COMMANDS, SPECIFICALLY NOTES ABOUT IMPORTING POOL FROM PREV. SYSTEM IF THIS IS A REINSTALL OF PROXMOX:
 zpool list
 root@benolilab:~# zpool list
 NAME      SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT

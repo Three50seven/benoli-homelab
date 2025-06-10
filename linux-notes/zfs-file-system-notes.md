@@ -12,7 +12,7 @@ zpool export nas-pool
 --or to force disconnects:
 sudo zpool export -f nas-pool
 
---view zfs pools (should see nas-pool)
+--view zfs pools (should see naspool)
 zpool import 
 
 --attach to new server and rename to naspool:
