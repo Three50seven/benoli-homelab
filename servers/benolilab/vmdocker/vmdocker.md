@@ -102,6 +102,52 @@ Client: Docker Engine - Community
     Version:  v2.29.7
     Path:     /usr/libexec/docker/cli-plugins/docker-compose
 
+# Mount the NAS server directory and localmedia directory for library files:
+	https://support.plex.tv/articles/201122318-mounting-network-resources/
+	-install cifs-utils:
+		apt install cifs-utils
+	-install nfs-common:
+		apt install nfs-common
+	-make mount directories:
+		mkdir /mnt/naspool
+		mkdir /mnt/sdb
+	--NOTE: CHOOSE EITHER CIFS OR NFS:
+	-mount NAS directory as CIFS (SMB):
+		mount -t cifs //192.168.1.103/naspool /mnt/naspool -o rw,user=krimmhouse
+	-mount NAS directory as NFS:
+		mount -t nfs 192.168.1.103:/naspool/share /mnt/naspool
+	-create partition on sdb in docker server:
+		fdisk -l (list partitions)
+		fdisk /dev/sdb (start fdisk on target disk)
+		n (for new partition)
+		-accept all defaults by just hitting enterprise
+		w - write the new partition if everything looks correct
+		lsblk - to show all disks and partitions (should now see sdb1 partition)
+		- create an ext4 file-system (WARNING - THIS WILL ERASE ALL CONTENT ON THE DISK):
+		mkfs.ext4 /dev/sdb1
+		- finally mount the new ext4 disk partition:
+		mount /dev/sdb1 /mnt/sdb	
+
+# Edit fstab to auto-mount at boot:
+	--copy fstab file to backup directory (after making a backups directory, if it doesn't exist, update date in backup as needed)
+		mkdir /backups
+		cp  /etc/fstab   /backups/fstab_bak_20241204
+	--list uuid for each drive:
+		ls -al /dev/disk/by-uuid/
+	--edit fstab file:
+		nano /etc/fstab
+	--add the lines:
+		# local drive sdb1
+		UUID=cbd4143f-b99b-4a77-93c8-714ea3d25325       /mnt/sdb        ext4    defaults        0       0
+		# naspool (network)
+		192.168.1.103:/naspool/share /mnt/naspool nfs defaults 0 0	
+		CTRL+X, y to save/write new file
+	--test fstab - check the last line for errors):
+		findmnt --verify
+		NOTE: Ignored udf,iso9660
+	--if everything looks okay, reload the mount fstab:
+		systemctl daemon-reload
+
 # Setup Docker directory and Docker Compose (Preferred)
 ```
 	mkdir /opt/benolilab-docker
@@ -123,6 +169,12 @@ Client: Docker Engine - Community
 	cd /opt/benolilab-docker
 	docker ps -a
 	docker compose up -d
+	# Or for a specific container (e.g. after adding to docker compose, without updating all containers)
+	docker compose up -d <container_name>
+	# Or to rebuild: 
+	docker compose up --build -d <container_name>
+	# Or to just restart:
+	docker compose restart <container_name>
 ```
 
 # To restart a service (by service name, not container name) - e.g. needed after updating a secret value
@@ -216,3 +268,54 @@ ssh user@192.168.x.x
 # Docker Volumes and files location on host:
 /var/lib/docker
 e.g. Volumes are here: /var/lib/docker/volumes
+
+# Syncthing Group and User setup
+_also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-homelab/blob/main/servers/benolinas/benolinas.md)_
+
+## Add syncthinguser Group:
+	groupadd -g 1001 syncthinguser
+
+## Add syncthinguser User (for managing syncthing service access to share without root access)
+	useradd -u 1001 -g 1001 -m -s /bin/bash syncthinguser
+
+## Create backup directories for docker containers (-p option will ensure parent directories are also created):
+	```
+	mkdir -p /mnt/naspool/benolilab-docker/syncthingdata
+	```
+## Change owner and grant permissions to read/write for syncthinguser user on backup directory:
+	```
+	chown syncthinguser:syncthinguser -R /mnt/naspool/benolilab-docker/syncthingdata
+	chmod -R 770 /mnt/naspool/benolilab-docker/syncthingdata
+	```
+## Update the default folder settings 
+	- Go to GUI via web URL - https://[DOCKER_HOST_IP]:8384 > Actions > Settings > Click "Edit Folder Defaults" in "General" tab > Click "Advanced" tab
+	- Change folder settings to receive only
+	- Check box to "Ignore Permissions"
+
+## When adding a new folder in Syncthing GUI:
+	- Create a new folder for each device's backups to keep syncing easier to manage.
+	- Make sure default settings are used (as mentioned/set above)
+	- Make sure to use the full folder path, i.e. /syncthingdata/new-folder-name
+	- Use lowercase kebab formatting e.g. new-folder-name	
+
+## Verify that the UID/GID mapping in the Syncthing container is correct:
+	```
+	# Run the following on the Docker host (vmdocker):
+	id syncthinguser
+	# Output should be something like: uid=1001(syncthinguser) gid=1001(syncthinguser) groups=1001(syncthinguser)
+	
+	# Run the same on Docker host and you should see a similar output (make sure the UID and GIDs are the same)
+	# Verify the owner is syncthinguser for the mnt
+	ls -ld /mnt/naspool/benolilab-docker/syncthingdata
+	
+	# If it's not, change ownership:
+	chown -R 1001:1001 /mnt/naspool/benolilab-docker/syncthingdata
+	
+	# Verify the UID/GID is used by the container:
+	docker logs syncthing | grep "User UID" && docker logs syncthing | grep "User GID"
+	# Expected output: User UID:    1001 && User GID:    1001
+	
+	# NOTE: You may need to take it down and rebuild it restart it if changes are made
+	docker compose down syncthing
+	docker compose up --build -d syncthing
+	```

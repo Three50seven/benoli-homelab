@@ -12,7 +12,7 @@ secrets:
         file: ./secrets/.backup_notifications_discord_hook_url
 services:
     portainer:
-        container_name: "portainer"
+        container_name: portainer
         image: "portainer/portainer-ce:alpine"
         networks:
           server_net:
@@ -133,7 +133,7 @@ services:
         labels:
             - com.centurylinklabs.watchtower.enable=true 
     volumes_backup:
-        container_name: "docker-volume-backup"
+        container_name: docker-volume-backup
         image: offen/docker-volume-backup:latest
         networks:
           server_net:
@@ -164,6 +164,7 @@ services:
             - nginx_proxy_letsencrypt:/backup/nginx_proxy_letsencrypt:ro
             - adguard_work:/backup/adguard_work:ro
             - adguard_conf:/backup/adguard_conf:ro
+            - syncthing_config:/backup/syncthing_config:ro
         restart: unless-stopped
         secrets:
             - volume_backup_nas_user
@@ -178,7 +179,7 @@ services:
             retries: 3
             start_period: 10s
     nginx_proxy:
-        container_name: "nginx-proxy"
+        container_name: nginx-proxy
         environment:
           - "DB_SQLITE_FILE=/config/database.sqlite"
           - "DISABLE_IPV6=true"
@@ -228,6 +229,33 @@ services:
             interval: 10s
             timeout: 30s
             retries: 3
+    syncthing:
+        container_name: syncthing
+        image: lscr.io/linuxserver/syncthing:latest
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.15
+        hostname: syncthing # optional
+        environment:
+          - PUID=1001 # match with syncthinguser - see vmdocker.md
+          - PGID=1001 # match with syncthinguser
+          - TZ=Etc/UTC
+        volumes:
+          - syncthing_config:/config
+          - /mnt/naspool/benolilab-docker/syncthingdata:/syncthingdata
+        ports:
+          - 8384:8384
+          - 22000:22000/tcp
+          - 22000:22000/udp
+          - 21027:21027/udp
+        restart: unless-stopped
+        labels:
+            - com.centurylinklabs.watchtower.enable=true
+        healthcheck:
+          test: ["CMD-SHELL", "wget --no-check-certificate --spider -q https://localhost:8384 || exit 1"]
+          interval: 1m
+          timeout: 10s
+          retries: 3
 volumes:
     portainer_data:
         name: portainer_data
@@ -249,6 +277,8 @@ volumes:
         name: plex_server_transcode
     plex_server_media:
         name: plex_server_media
+    syncthing_config:
+        name: syncthing_config
 networks:
     server_net:
         name: server_net
