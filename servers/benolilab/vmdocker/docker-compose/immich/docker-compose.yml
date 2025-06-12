@@ -1,0 +1,114 @@
+name: immich-docker
+secrets:    
+    immich_db_name:
+        file: ./secrets/.immich_db_name
+    immich_db_username:
+        file: ./secrets/.immich_db_username
+    immich_db_password:
+        file: ./secrets/.immich_db_password
+services:
+    immich-server:
+        user: "999:1002"  # Replace with the Immich user's UID/GID
+        container_name: immich-server
+        image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+        networks:
+            server_net:
+                ipv4_address: 172.18.0.20
+        # extends:
+        #   file: hwaccel.transcoding.yml
+        #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
+        volumes:
+            # Do not edit the next line. If you want to change the media storage location on your system, edit the value of UPLOAD_LOCATION in the .env file
+            - ${UPLOAD_LOCATION}:/usr/src/app/upload
+            - /etc/localtime:/etc/localtime:ro
+        env_file:
+            - .env
+        environment:
+            REDIS_HOSTNAME: immich-redis
+            DB_HOSTNAME: immich-database
+        ports:
+            - '2283:2283'
+        depends_on:
+            - immich-redis
+            - immich-database
+        restart: always
+        secrets:
+            - immich_db_name
+            - immich_db_username
+            - immich_db_password
+        healthcheck:
+            test: "curl -f http://localhost:2283"
+            interval: 15s
+            timeout: 45s
+            retries: 10
+
+    immich-machine-learning:
+        container_name: immich-machine-learning
+        # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
+        # Example tag: ${IMMICH_VERSION:-release}-cuda
+        image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+        networks:
+            server_net:
+                ipv4_address: 172.18.0.21
+        # extends: # uncomment this section for hardware acceleration - see https://immich.app/docs/features/ml-hardware-acceleration
+        #   file: hwaccel.ml.yml
+        #   service: cpu # set to one of [armnn, cuda, rocm, openvino, openvino-wsl, rknn] for accelerated inference - use the `-wsl` version for WSL2 where applicable
+        volumes:
+            - immich_model_cache:/cache
+        env_file:
+            - .env
+        restart: always
+        healthcheck:
+            test: ["CMD", "bash", "-c", "exec 5<>/dev/tcp/127.0.0.1/3003"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    immich-redis:
+        container_name: immich-redis
+        image: docker.io/valkey/valkey:8-bookworm@sha256:ff21bc0f8194dc9c105b769aeabf9585fea6a8ed649c0781caeac5cb3c247884
+        networks:
+            server_net:
+                ipv4_address: 172.18.0.22
+        healthcheck:
+            test: ["CMD-SHELL", "redis-cli -h localhost ping || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        restart: always
+
+    immich-database:
+        container_name: immich-database
+        image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0@sha256:fa4f6e0971f454cd95fec5a9aaed2ed93d8f46725cc6bc61e0698e97dba96da1
+        networks:
+            server_net:
+                ipv4_address: 172.18.0.23
+        environment:
+          POSTGRES_DB_FILE: ${DB_DATABASE_NAME_FILE}
+          POSTGRES_USER_FILE: ${DB_USERNAME_FILE}
+          POSTGRES_PASSWORD_FILE: ${DB_PASSWORD_FILE}
+          POSTGRES_INITDB_ARGS: '--data-checksums'
+          # Uncomment the DB_STORAGE_TYPE: 'HDD' var if your database isn't stored on SSDs
+          DB_STORAGE_TYPE: 'HDD'
+        volumes:
+          # Do not edit the next line. If you want to change the database storage location on your system, edit the value of DB_DATA_LOCATION in the .env file
+          - immich_pgdata:/var/lib/postgresql/data
+        restart: always
+        secrets:
+            - immich_db_name
+            - immich_db_username
+            - immich_db_password
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U $(cat /run/secrets/immich_db_username) -d $(cat /run/secrets/immich_db_name)"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+volumes:
+    immich_model_cache:
+        name: immich_model_cache
+    immich_pgdata:
+        name: immich_pgdata
+networks:
+    server_net:
+        name: server_net
+        external: true # prevent from defining again since volume is defined in docker-compose/docker-compose.yml

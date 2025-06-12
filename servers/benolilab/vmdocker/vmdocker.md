@@ -319,3 +319,27 @@ _also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-h
 	docker compose down syncthing
 	docker compose up --build -d syncthing
 	```
+
+# Immich - photo and video manager and backup service
+	- Add immichgroup Group && User (for managing immich service access to share without root access):
+	```
+	groupadd immichgroup
+	useradd -r -s /bin/false -g immichgroup immichuser
+	id immichuser # Get the user and group id for docker-compose.yml - see variable user:
+	```
+	- Create a storage directory for immich on the naspool and change owner to new user/group with rwx permissions:
+	```
+	mkdir -p /mnt/naspool/benolilab-docker/immichdata
+	chown -R immichuser:immichgroup /mnt/naspool/benolilab-docker/immichdata
+	chmod -R 770 /mnt/naspool/benolilab-docker/immichdata
+	```
+	- Create the docker-compose directory for the immich docker stack:
+	```
+	mkdir -p /opt/immich-docker
+	```
+	- Follow similar directions for running docker compose etc. for the immich compose file
+	```
+	cd /opt/immich-docker
+	docker ps -a
+	docker compose up -d
+	```

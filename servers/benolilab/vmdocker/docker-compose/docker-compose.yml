@@ -165,6 +165,8 @@ services:
             - adguard_work:/backup/adguard_work:ro
             - adguard_conf:/backup/adguard_conf:ro
             - syncthing_config:/backup/syncthing_config:ro
+            - immich_pgdata:/backup/immich_pgdata:ro
+            - immich_model_cache:/backup/immich_model_cache:ro
         restart: unless-stopped
         secrets:
             - volume_backup_nas_user
@@ -279,6 +281,10 @@ volumes:
         name: plex_server_media
     syncthing_config:
         name: syncthing_config
+    immich_pgdata:
+        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
+    immich_model_cache:
+        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
 networks:
     server_net:
         name: server_net
