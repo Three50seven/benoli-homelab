@@ -48,7 +48,7 @@ ensure_log_files_exist() {
         if [[ ! -f "$path" ]]; then
             touch "$path"
             if [[ $? -ne 0 ]]; then
-                echo "Error: Failed to create log file: $path—check permissions!"
+                echo "Error: Failed to create log file: $path  - check permissions!"
                 exit 1
             else
                 echo "Info: Created missing log file: $path"
@@ -97,7 +97,7 @@ trim_log_files() {
                 log_message "Error: Failed to replace $LOCAL_LOG_FILE with trimmed version"
             fi
         else
-            log_message "Warning: Log file $LOCAL_LOG_FILE does not exist—skipping trim."
+            log_message "Warning: Log file $LOCAL_LOG_FILE does not exist-skipping trim."
         fi
     done
 }
@@ -238,21 +238,21 @@ send_discord_notification() {
 
 # Stop the backup if SOURCE_POOL is blank or the ZFS pool is offline
 if [[ -z "$SOURCE_POOL" ]]; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** SOURCE_POOL variable is blank — ZFS backup aborted!"
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** SOURCE_POOL variable is blank - ZFS backup aborted!"
     exit 1
 fi
 if ! zpool list | grep -q "$SOURCE_POOL"; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** Source Pool ($SOURCE_POOL) is offline — ZFS backup aborted!"
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** Source Pool ($SOURCE_POOL) is offline - ZFS backup aborted!"
     exit 1
 fi
 
 # Stop the backup if the BACKUP_POOL is blank or the ZFS pool is offline:
 if [[ -z "$BACKUP_POOL" ]]; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** BACKUP_POOL variable is blank — ZFS backup aborted!"
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** BACKUP_POOL variable is blank - ZFS backup aborted!"
     exit 1
 fi
 if ! zpool list | grep -q "$BACKUP_POOL"; then
-    send_discord_notification ":x: **ZFS Pool Backup Aborted** Backup Pool ($BACKUP_POOL) is offline — ZFS backup aborted!"
+    send_discord_notification ":x: **ZFS Pool Backup Aborted** Backup Pool ($BACKUP_POOL) is offline - ZFS backup aborted!"
     exit 1
 fi
 
@@ -317,7 +317,7 @@ log_existing_snapshots() {
 
     # Check if the pool is available before proceeding
     if ! zpool list | grep -q "$POOL"; then
-        log_message "Warning: Pool $POOL is offline—skipping snapshot logging!"
+        log_message "Warning: Pool $POOL is offline-skipping snapshot logging!"
         return
     fi
 
@@ -340,7 +340,7 @@ snapshot_sent_to_all_pools() {
 
     for POOL in "${REQUIRED_POOLS[@]}"; do
         if ! grep -q "$SNAP_NAME $POOL" "$SNAPSHOT_TRANSFER_HISTORY_LOG"; then
-            log_message "Warning: $SNAP_NAME has not been confirmed on $POOL—skipping deletion!"
+            log_message "Warning: $SNAP_NAME has not been confirmed on $POOL-skipping deletion!"
             return 1 # Exit with failure (snapshot must remain)
         fi
     done
@@ -441,7 +441,7 @@ cleanup_snapshots() {
 
     for POOL in "${REQUIRED_POOLS[@]}"; do
         if ! zpool list | grep -q "$POOL"; then
-            log_message "Warning: Pool $POOL is offline—will use historical logs for validation."
+            log_message "Warning: Pool $POOL is offline-will use historical logs for validation."
         fi
 
         SNAPSHOT_COUNT=$(zfs list -H -t snapshot -o name "$POOL" | grep "$SNAP_TYPE" | wc -l)
@@ -449,7 +449,7 @@ cleanup_snapshots() {
         log_message "Info: $SNAPSHOT_COUNT $SNAP_TYPE snapshots exist for ZFS pool $POOL before cleanup."
         
         if (( SNAPSHOT_COUNT <= MINIMUM_SNAPSHOTS )); then
-            log_message "Warning: Skipping cleanup in $POOL—only $SNAPSHOT_COUNT snapshot(s) left!"
+            log_message "Warning: Skipping cleanup in $POOL-only $SNAPSHOT_COUNT snapshot(s) left!"
             continue
         fi
 
@@ -467,7 +467,7 @@ cleanup_snapshots() {
             local safe_to_delete=true
             for BACKUP_POOL in "${REQUIRED_POOLS[@]}"; do
                 if ! zfs list -H -t snapshot -o name "$BACKUP_POOL" | grep -q "$SNAP"; then
-                    log_message "Warning: $SNAP is missing from $BACKUP_POOL—skipping deletion!"
+                    log_message "Warning: $SNAP is missing from $BACKUP_POOL-skipping deletion!"
                     safe_to_delete=false
                     break
                 fi
@@ -478,7 +478,7 @@ cleanup_snapshots() {
                 log_message "Info: Safe to delete snapshot $SNAP."
                 if [[ "$IS_TEST" == false ]]; then
                     zfs destroy -r "$SNAP"
-                    log_message "Info: Snapshot $SNAP destroyed—record retained in history log ($SNAPSHOT_TRANSFER_HISTORY_LOG)."
+                    log_message "Info: Snapshot $SNAP destroyed-record retained in history log ($SNAPSHOT_TRANSFER_HISTORY_LOG)."
                 else
                     log_message "Info: Skipping deletion (IS_TEST=true): Would have destroyed: $SNAP"
                 fi

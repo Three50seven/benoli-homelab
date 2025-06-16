@@ -25,10 +25,10 @@ Amazon Description:
 * ref: https://www.reddit.com/r/BeelinkOfficial/comments/13lqrz4/beelink_eq12_eq12pro_how_to_set_auto_power_on/
 1. Press the Del key repeatedly after powering on the mini PC to enter the BIOS setup
 2. Enter BIOS setup.
-3. Use the arrow keys to enter the Chipset page. Select “PCH-IO Configuration” and press the Enter key.
-4. Select “State After G3”.
-5. Select “S0 State”. “S0 State” is to enable auto power on and “S5 State” is to disable auto power on.
-6. Press the F4 and select “Yes” to save the configuration.
+3. Use the arrow keys to enter the Chipset page. Select "PCH-IO Configuration" and press the Enter key.
+4. Select "State After G3".
+5. Select "S0 State". "S0 State" is to enable auto power on and "S5 State" is to disable auto power on.
+6. Press the F4 and select "Yes" to save the configuration.
 * You can unplug the power supply and then plug it back to test whether the setup succeeded
 	
 # Create ZFS Pool with remaining diskspace:

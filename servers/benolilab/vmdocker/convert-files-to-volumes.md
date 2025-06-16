@@ -37,7 +37,7 @@ NOTE: You will get a warning unless you add external: true to each of the new vo
 	docker compose up -d
 ```
 
-By following these steps, the host's ./data will be copied to the uptime_kuma_data volume, and the volume will be mounted in the container. You’ll have successfully migrated the data from the host to the Docker volume.
+By following these steps, the host's ./data will be copied to the uptime_kuma_data volume, and the volume will be mounted in the container. You'll have successfully migrated the data from the host to the Docker volume.
 You can then clean-up the directory like so:
 Use the find command on the host to see if there are any other remnants of the files you copied to the new volumes:
 ```

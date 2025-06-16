@@ -8,7 +8,7 @@ Untar the backup you want to restore
 ```
 tar -C /tmp -xvf  backup.tar.gz
 ```
-Using a temporary once-off container, mount the volume (the example assumes it’s named data) and copy over the backup. Make sure you copy the correct path level (this depends on how you mount your volume into the backup container), you might need to strip some leading elements
+Using a temporary once-off container, mount the volume (the example assumes it's named data) and copy over the backup. Make sure you copy the correct path level (this depends on how you mount your volume into the backup container), you might need to strip some leading elements
 ```
 docker run -d --name temp_restore_container -v data:/backup_restore alpine
 docker cp /tmp/backup/data-backup temp_restore_container:/backup_restore
@@ -26,7 +26,7 @@ If volume was initially created using docker-compose, find out exact volume name
 ```
 docker volume ls
 ```
-Remove existing volume (the example assumes it’s named data):
+Remove existing volume (the example assumes it's named data):
 ```
 docker volume rm data
 ```

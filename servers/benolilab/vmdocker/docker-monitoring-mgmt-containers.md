@@ -27,7 +27,7 @@ portainer:
 -Updating Portainer
 
 -Backup Your Data: Before updating, it's a good idea to back up your Portainer data. This ensures you can restore your setup if anything goes wrong.
-	Backing up your Portainer data before updating is a crucial step to ensure you can restore your setup if anything goes wrong. Here’s how you can do it:
+	Backing up your Portainer data before updating is a crucial step to ensure you can restore your setup if anything goes wrong. Here's how you can do it:
 
 	Create a Backup Volume: First, create a backup volume to store your Portainer data.
 

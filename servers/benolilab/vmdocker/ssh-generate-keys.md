@@ -20,7 +20,7 @@ Or enter a custom path if you want to save it elsewhere.
 You'll be asked:
 
 Enter passphrase (empty for no passphrase):
-Leave it empty if you don’t want to use a passphrase (useful for automated processes).
+Leave it empty if you don't want to use a passphrase (useful for automated processes).
 Enter a strong passphrase if you want added security.
 
 4. Copy the Public Key to Your SSH Server
@@ -34,7 +34,7 @@ Alternatively, manually copy the key:
 ```
 	cat ~/.ssh/id_rsa.pub
 ```
-Then, add it to the remote server’s ~/.ssh/authorized_keys file:
+Then, add it to the remote server's ~/.ssh/authorized_keys file:
 ```
 	echo "your-public-key-content" >> ~/.ssh/authorized_keys
 	chmod 600 ~/.ssh/authorized_keys

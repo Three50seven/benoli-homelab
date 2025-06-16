@@ -53,7 +53,7 @@ ip add show
  - get the name of the network interface (in this case it's ens18)
 nano /etc/network/interfaces
 
-Replace the line ‘allow-htplug ens18’ with ‘auto ens18‘ and change dhcp parameter to static.  Below is my sample file, change interface name and ip details as per your environment.
+Replace the line 'allow-htplug ens18' with 'auto ens18' and change dhcp parameter to static.  Below is my sample file, change interface name and ip details as per your environment.
 
 auto ens18
 iface ens18 inet static
@@ -250,7 +250,7 @@ ssh user@192.168.x.x
 ```
 
 # Test SSH or Tracert (Network issues) From a Container:
-- To SSH into a Docker container, you typically use docker exec rather than traditional SSH. Here’s how you can do it:
+- To SSH into a Docker container, you typically use docker exec rather than traditional SSH. Here's how you can do it:
 - Find the Container ID or Name: List all running containers to find the container ID or name.
 ```
 	docker ps
