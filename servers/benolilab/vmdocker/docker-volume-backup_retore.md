@@ -3,12 +3,24 @@ reference: https://offen.github.io/docker-volume-backup/how-tos/restore-volumes-
 
 In case you need to restore a volume from a backup, the most straight forward procedure to do so would be:
 
+## Check which containers are using the volume:
+```
+	docker ps -a --filter volume=<VOLUME_NAME_HERE> --format "{{.Names}}"
+```
+
 Stop the container(s) that are using the volume
+```
+	docker stop <container_name>
+	docker rm <containera_name> # This step is needed to stop the container from using the volume
+	docker run --rm -v <volume_name>:/data -v /host_backup:/backup alpine cp -r /data /backup
+	docker volume rm <volume_name> # Only remove the volume after making a backup
+```
 Untar the backup you want to restore
 ```
 tar -C /tmp -xvf  backup.tar.gz
 ```
 Using a temporary once-off container, mount the volume (the example assumes it's named data) and copy over the backup. Make sure you copy the correct path level (this depends on how you mount your volume into the backup container), you might need to strip some leading elements
+You may be able to alternatively run docker compose up -d for all the containers and just let it recreate the volume after removing the old or corrupt one.
 ```
 docker run -d --name temp_restore_container -v data:/backup_restore alpine
 docker cp /tmp/backup/data-backup temp_restore_container:/backup_restore
