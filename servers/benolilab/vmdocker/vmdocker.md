@@ -343,3 +343,16 @@ _also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-h
 	docker ps -a
 	docker compose up -d
 	```
+
+# Monitorance - Monitoring and Maintenance apps
+	- Create the docker-compose directory for the monitorance docker stack:
+	```
+	mkdir -p /opt/monitorance-docker
+	mkdir /opt/monitorance-docker/secrets
+	```
+	- Follow similar directions for running docker compose etc. for the monitorance compose file
+	```
+	cd /opt/monitorance-docker
+	docker ps -a
+	docker compose up -d
+	```

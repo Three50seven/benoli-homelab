@@ -1,0 +1,279 @@
+name: monitorance-docker
+secrets:    
+    watchtower_discord_hook:
+        file: ./secrets/.watchtower_discord_hook
+    volume_backup_nas_user:
+        file: ./secrets/.volume_backup_nas_user
+    volume_backup_nas_pw:
+        file: ./secrets/.volume_backup_nas_pw
+    backup_notifications_discord_hook_url:
+        file: ./secrets/.backup_notifications_discord_hook_url
+services:
+    portainer:
+        container_name: portainer
+        image: "portainer/portainer-ce:alpine"
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.10
+        ports:
+          - "9443:9443/tcp"
+        restart: always
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock"
+          - "portainer_data:/data"
+        healthcheck:
+              test: ["CMD-SHELL", "wget --no-check-certificate --spider -q https://localhost:9443/api/status || exit 1"]
+              interval: 1m30s
+              timeout: 30s
+              retries: 5
+        labels:
+            description: "Portainer is a web-based Docker management system that provides a convenient graphical user interface (GUI). It lets you take charge of your containers, images, volumes, and other resources, without memorizing long terminal commands."
+            com.centurylinklabs.watchtower.enable: "true"
+    watchtower:
+        container_name: watchtower
+        image: containrrr/watchtower
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.11
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        restart: unless-stopped
+        environment:
+            WATCHTOWER_CLEANUP: true
+            WATCHTOWER_DEBUG: true
+            WATCHTOWER_ROLLING_RESTART: true
+            WATCHTOWER_LABEL_ENABLE: true
+            WATCHTOWER_SCHEDULE: 0 0 9 * * 5
+            WATCHTOWER_NOTIFICATION_REPORT: true
+            WATCHTOWER_NOTIFICATION_URL: /run/secrets/watchtower_discord_hook
+            WATCHTOWER_NOTIFICATION_TEMPLATE: |
+                {{- if .Report -}}
+                    {{- with .Report -}}
+                {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+                    {{- range .Updated}}
+                - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+                    {{- end -}}
+                    {{- range .Fresh}}
+                - {{.Name}} ({{.ImageName}}): {{.State}}
+                    {{- end -}}
+                    {{- range .Skipped}}
+                - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+                    {{- end -}}
+                    {{- range .Failed}}
+                - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+                    {{- end -}}
+                    {{- end -}}
+                {{- else -}}
+                    {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
+                {{- end -}}
+        secrets:
+            - watchtower_discord_hook
+        healthcheck:
+              test: ["CMD", "/watchtower", "--health-check"]
+              interval: 1m30s
+              timeout: 10s
+              retries: 3
+              start_period: 40s
+        labels:
+            description: "Watchtower is an application that will monitor your running Docker containers and watch for changes to the images that those containers were originally started from."
+            com.centurylinklabs.watchtower.enable: "true"
+    uptime-kuma:
+        container_name: uptime-kuma
+        image: louislam/uptime-kuma:1
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.12
+        volumes:
+            - uptime_kuma_data:/app/data
+            - /var/run/docker.sock:/var/run/docker.sock
+        ports:
+            # <Host Port>:<Container Port>
+            - 3001:3001
+        restart: unless-stopped
+        healthcheck:
+            test: "curl --connect-timeout 15 --max-time 100 --silent --show-error --fail 'http://localhost:3001/dashboard'"
+            interval: 1m
+            timeout: 15s
+            retries: 3
+            start_period: 1m
+        labels:
+            description: "Uptime Kuma is a self-hosted monitoring tool designed to track the uptime status of websites, applications, or network services."
+            com.centurylinklabs.watchtower.enable: "true"
+    docker-volume-backup:
+        container_name: docker-volume-backup
+        image: offen/docker-volume-backup:latest
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.14
+        environment:
+            BACKUP_FILENAME: backup-%Y-%m-%dT%H-%M-%S.tar.gz
+            BACKUP_PRUNING_PREFIX: backup-
+            BACKUP_RETENTION_DAYS: 5
+            BACKUP_CRON_EXPRESSION: 0 3 * * *
+            SSH_HOST_NAME: ${NAS_IP_ADDRESS}
+            SSH_PORT: 22
+            SSH_USER_FILE: /run/secrets/volume_backup_nas_user
+            SSH_PASSWORD_FILE: /run/secrets/volume_backup_nas_pw
+            SSH_REMOTE_PATH: /naspool/backups/benolilab-docker/container-volumes
+            NOTIFICATION_LEVEL: info
+            NOTIFICATION_URLS_FILE: /run/secrets/backup_notifications_discord_hook_url
+        volumes:
+            - /etc/timezone:/etc/timezone:ro
+            - /etc/localtime:/etc/localtime:ro
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - plex_server_config:/backup/plex_server_config:ro
+            - plex_server_transcode:/backup/plex_server_transcode:ro
+            - plex_server_media:/backup/plex_server_media:ro
+            - portainer_data:/backup/portainer_data:ro
+            - uptime_kuma_data:/backup/uptime_kuma_data:ro
+            - nginx_proxy_config:/backup/nginx_proxy_config:ro
+            - nginx_proxy_data:/backup/nginx_proxy_data:ro
+            - nginx_proxy_letsencrypt:/backup/nginx_proxy_letsencrypt:ro
+            - adguard_work:/backup/adguard_work:ro
+            - adguard_conf:/backup/adguard_conf:ro
+            - syncthing_config:/backup/syncthing_config:ro
+            - immich_pgdata:/backup/immich_pgdata:ro
+            - immich_model_cache:/backup/immich_model_cache:ro
+            - immich_redis_data:/backup/immich_redis_data:ro
+            - prometheus_data:/backup/prometheus_data:ro
+            - prometheus_config:/backup/prometheus_config:ro
+            - grafana_data:/backup/grafana_data:ro
+        restart: unless-stopped
+        secrets:
+            - volume_backup_nas_user
+            - volume_backup_nas_pw
+            - backup_notifications_discord_hook_url
+        labels:
+            description: "Docker Volume Backup handles backing up named volumes within the host."
+            com.centurylinklabs.watchtower.enable: "true"
+        healthcheck:
+            test: "exit 0"
+            interval: 60s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+    grafana:
+        container_name: grafana
+        image: grafana/grafana
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.16
+        ports:
+          - "3002:3000"
+        volumes:
+          - grafana_data:/var/lib/grafana
+        restart: unless-stopped
+        labels:
+            description: "Grafana is an open-source data visualization and monitoring platform. It allows users to query, visualize, and alert on data from various sources, providing a comprehensive view of system health, application performance, and other metrics through customizable dashboards."
+            com.centurylinklabs.watchtower.enable: "true"
+        healthcheck:
+          test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+    prometheus:
+        container_name: prometheus
+        image: prom/prometheus
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.17
+        ports:
+          - "9090:9090"
+        volumes:
+          - prometheus_data:/etc/prometheus
+          - prometheus_config:/prometheus
+        restart: unless-stopped
+        labels:
+            description: "Prometheus is a popular monitoring and alerting system. You'll need to set it up to collect Docker container metrics, including memory usage."
+            com.centurylinklabs.watchtower.enable: "true"
+        healthcheck:
+          test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/ || exit 1"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+    cadvisor:
+        container_name: cadvisor
+        image: gcr.io/cadvisor/cadvisor
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.18
+        ports:
+          - "8081:8080"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+          - /sys:/sys
+          - /var/lib/docker/:/var/lib/docker
+        restart: unless-stopped
+        labels:
+            description: "cAdvisor (Container Advisor) is a tool that provides detailed resource usage information for containers. It can be used alongside Prometheus to gather even more granular data."
+            com.centurylinklabs.watchtower.enable: "true"
+        healthcheck:
+          test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/ || exit 1"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+    node-exporter:
+        container_name: node-exporter
+        image: prom/node-exporter
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.19
+        ports:
+          - "9100:9100"
+        restart: unless-stopped
+        labels:
+            description: "Node Exporter tool collects host-level metrics, including CPU, memory, and disk usage, which can be helpful for understanding the overall system resources available to your Docker containers."
+            com.centurylinklabs.watchtower.enable: "true"
+        healthcheck:
+          test: ["CMD-SHELL", "wget -q --spider http://localhost:9100/metrics || exit 1"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+volumes:
+    portainer_data:
+        name: portainer_data
+    uptime_kuma_data:
+        name: uptime_kuma_data
+    grafana_data:
+        name: grafana_data
+    prometheus_data:
+        name: prometheus_data
+    prometheus_config:
+        name: prometheus_config
+    nginx_proxy_config:
+        name: nginx_proxy_config
+        external: true # defined in docker-compose/docker-compose.yml
+    nginx_proxy_letsencrypt:
+        name: nginx_proxy_letsencrypt
+        external: true # defined in docker-compose/docker-compose.yml
+    nginx_proxy_data:
+        name: nginx_proxy_data
+        external: true # defined in docker-compose/docker-compose.yml
+    adguard_work:
+        name: adguard_work
+        external: true # defined in docker-compose/docker-compose.yml
+    adguard_conf:
+        name: adguard_conf
+        external: true # defined in docker-compose/docker-compose.yml
+    plex_server_config:
+        name: plex_server_config
+        external: true # defined in docker-compose/docker-compose.yml
+    plex_server_transcode:
+        name: plex_server_transcode
+        external: true # defined in docker-compose/docker-compose.yml
+    plex_server_media:
+        name: plex_server_media
+        external: true # defined in docker-compose/docker-compose.yml
+    syncthing_config:
+        name: syncthing_config
+        external: true # defined in docker-compose/docker-compose.yml
+    immich_pgdata:
+        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
+    immich_model_cache:
+        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
+    immich_redis_data:
+        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
+networks:
+    server_net:
+        name: server_net
+        external: true # prevent from defining again since volume is defined in docker-compose/docker-compose.yml
