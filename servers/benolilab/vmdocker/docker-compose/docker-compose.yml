@@ -59,7 +59,8 @@ services:
           - "nginx_proxy_data:/data"
         labels:
             description: "Nginx, pronounced 'engine-x,' is a versatile open-source software that acts as a web server, reverse proxy, load balancer, and more."
-            com.centurylinklabs.watchtower.enable: "true" 
+            com.centurylinklabs.watchtower.enable: "true"
+            docker-volume-backup.stop-during-backup: "true"
         healthcheck:
           test: ["CMD", "/bin/check-health"]
           interval: 10s
@@ -114,6 +115,7 @@ services:
         labels:
             description: "Syncthing is a continuous file synchronization program. It synchronizes files between two or more computers in real time."
             com.centurylinklabs.watchtower.enable: "true"
+            com.docker.backup.restart-policy: unless-stopped
         healthcheck:
           test: ["CMD-SHELL", "wget --no-check-certificate --spider -q https://localhost:8384 || exit 1"]
           interval: 1m

@@ -356,3 +356,35 @@ _also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-h
 	docker ps -a
 	docker compose up -d
 	```
+
+# Create Docker Container called volume-backup-wrapper for custom volume backup scripts
+	- This is a wrapper container for the offen\docker-volume-backup container
+	```
+	# Test-drive the app - make sure DRY_RUN is set to true in backup.env file before running the run-backup.sh script if you just want to test the command output
+		docker compose run --rm -it volume-backup-wrapper /bin/sh
+	# breakdown of command: 
+	# -rm Automatically removes the container after it exits to prevent clutter with leftover containers
+	# -i stands for "Interactive" - keeps STDIN open so you can type into the shell
+	# -t Allocates a pseudo-TTY, which makes the shell experience feel like you're on a real terminal
+
+	# Once inside the shell of the wrapper container, you can run this to test the backup scripts:
+		 /bin/sh -c '/app/scripts/run-backup.sh'
+
+	# Type 'exit' to quit the container shell and destroy the temp container.
+
+	# To rebuild after changing the Dockerfile, or other internal files (e.g. scripts) run:
+		docker compose build --no-cache
+
+	# To run shell inside the composed container and poke around, run:
+		docker compose exec volume-backup-wrapper sh
+	```
+
+# Removing special characters in text editor:
+	- Some special characters will cause some scripts to fail, so it's best to remove them
+	- Search for: [^\x00-\x7F]
+	- make sure to check or enable "use regular expressions"
+
+## Also make sure line endings are Unix in shell scripts
+	- in Notepad++ you can open the file, and look in the bottom right corner to see if the file is Windows (CR LF) or Unix (LF)
+	- to convert to Unix (LF) open in Notepad++ and click Edit > EOL Conversion > Unix (LF)
+	- Save the file and upload to host machine needing/using the script

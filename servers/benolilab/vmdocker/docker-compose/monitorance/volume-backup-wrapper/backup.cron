@@ -1,0 +1,3 @@
+# Run once daily at the time in BACKUP_SCHEDULE - supercron will execute the schedule
+# by default supercron uses /bin/sh as the shell to execute commands instead of bash, so make sure to add '/usr/bin/env bash' before your command when bash is needed
+$BACKUP_SCHEDULE /usr/bin/env bash /app/scripts/run-backup.sh

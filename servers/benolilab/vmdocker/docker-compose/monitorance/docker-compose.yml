@@ -1,13 +1,7 @@
 name: monitorance-docker
 secrets:    
     watchtower_discord_hook:
-        file: ./secrets/.watchtower_discord_hook
-    volume_backup_nas_user:
-        file: ./secrets/.volume_backup_nas_user
-    volume_backup_nas_pw:
-        file: ./secrets/.volume_backup_nas_pw
-    backup_notifications_discord_hook_url:
-        file: ./secrets/.backup_notifications_discord_hook_url
+        file: ./secrets/.watchtower_discord_hook    
 services:
     portainer:
         container_name: portainer
@@ -99,59 +93,34 @@ services:
         labels:
             description: "Uptime Kuma is a self-hosted monitoring tool designed to track the uptime status of websites, applications, or network services."
             com.centurylinklabs.watchtower.enable: "true"
-    docker-volume-backup:
-        container_name: docker-volume-backup
-        image: offen/docker-volume-backup:latest
+            docker-volume-backup.stop-during-backup: "true"
+    volume-backup-wrapper:
+        build: ./volume-backup-wrapper
+        container_name: volume-backup-wrapper
         networks:
           server_net:
             ipv4_address: 172.18.0.14
-        environment:
-            BACKUP_FILENAME: backup-%Y-%m-%dT%H-%M-%S.tar.gz
-            BACKUP_PRUNING_PREFIX: backup-
-            BACKUP_RETENTION_DAYS: 5
-            BACKUP_CRON_EXPRESSION: 0 3 * * *
-            SSH_HOST_NAME: ${NAS_IP_ADDRESS}
-            SSH_PORT: 22
-            SSH_USER_FILE: /run/secrets/volume_backup_nas_user
-            SSH_PASSWORD_FILE: /run/secrets/volume_backup_nas_pw
-            SSH_REMOTE_PATH: /naspool/backups/benolilab-docker/container-volumes
-            NOTIFICATION_LEVEL: info
-            NOTIFICATION_URLS_FILE: /run/secrets/backup_notifications_discord_hook_url
         volumes:
-            - /etc/timezone:/etc/timezone:ro
-            - /etc/localtime:/etc/localtime:ro
-            - /var/run/docker.sock:/var/run/docker.sock:ro
-            - plex_server_config:/backup/plex_server_config:ro
-            - plex_server_transcode:/backup/plex_server_transcode:ro
-            - plex_server_media:/backup/plex_server_media:ro
-            - portainer_data:/backup/portainer_data:ro
-            - uptime_kuma_data:/backup/uptime_kuma_data:ro
-            - nginx_proxy_config:/backup/nginx_proxy_config:ro
-            - nginx_proxy_data:/backup/nginx_proxy_data:ro
-            - nginx_proxy_letsencrypt:/backup/nginx_proxy_letsencrypt:ro
-            - adguard_work:/backup/adguard_work:ro
-            - adguard_conf:/backup/adguard_conf:ro
-            - syncthing_config:/backup/syncthing_config:ro
-            - immich_pgdata:/backup/immich_pgdata:ro
-            - immich_model_cache:/backup/immich_model_cache:ro
-            - immich_redis_data:/backup/immich_redis_data:ro
-            - prometheus_data:/backup/prometheus_data:ro
-            - prometheus_config:/backup/prometheus_config:ro
-            - grafana_data:/backup/grafana_data:ro
+            - /var/run/docker.sock:/var/run/docker.sock  # For control
+            - ./scripts:/scripts:ro
+            - ./secrets/.volume_backup_nas_user:/run/secrets/volume_backup_nas_user:ro # Secrets need to be passed in as files to the wrapper container so that the backup container can use their values like a normal secret
+            - ./secrets/.volume_backup_nas_pw:/run/secrets/volume_backup_nas_pw:ro
+            - ./secrets/.backup_notifications_discord_hook_url:/run/secrets/backup_notifications_discord_hook_url:ro    
+        env_file:
+            - ./backup.env
+        environment:
+            DRY_RUN: true
+            DISABLE_CRON: false 
         restart: unless-stopped
-        secrets:
-            - volume_backup_nas_user
-            - volume_backup_nas_pw
-            - backup_notifications_discord_hook_url
         labels:
-            description: "Docker Volume Backup handles backing up named volumes within the host."
-            com.centurylinklabs.watchtower.enable: "true"
+            description: "Wrapper container for the offen/docker-volume-backup immage.  It handles special cases where container-logs need to be checked prior to stopping them for backups (e.g. file synching processes that could be happening during a volume backup)."
+            # com.docker.backup.restart-policy: {{match-to-docker-compose-restart-policy-value}} # Add this label to containers to store the original docker compose restart policy for applying back to the container after it is restarted after backups
         healthcheck:
-            test: "exit 0"
-            interval: 60s
-            timeout: 5s
-            retries: 3
-            start_period: 10s
+          test: ["CMD-SHELL", "/app/scripts/healthcheck.sh"]
+          interval: 60s
+          timeout: 5s
+          retries: 3
+          start_period: 10s
     grafana:
         container_name: grafana
         image: grafana/grafana
@@ -166,6 +135,7 @@ services:
         labels:
             description: "Grafana is an open-source data visualization and monitoring platform. It allows users to query, visualize, and alert on data from various sources, providing a comprehensive view of system health, application performance, and other metrics through customizable dashboards."
             com.centurylinklabs.watchtower.enable: "true"
+            docker-volume-backup.stop-during-backup: "true"
         healthcheck:
           test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
           interval: 30s
@@ -186,6 +156,7 @@ services:
         labels:
             description: "Prometheus is a popular monitoring and alerting system. You'll need to set it up to collect Docker container metrics, including memory usage."
             com.centurylinklabs.watchtower.enable: "true"
+            docker-volume-backup.stop-during-backup: "true"
         healthcheck:
           test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/ || exit 1"]
           interval: 30s
@@ -207,6 +178,7 @@ services:
         labels:
             description: "cAdvisor (Container Advisor) is a tool that provides detailed resource usage information for containers. It can be used alongside Prometheus to gather even more granular data."
             com.centurylinklabs.watchtower.enable: "true"
+            docker-volume-backup.stop-during-backup: "true"
         healthcheck:
           test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/ || exit 1"]
           interval: 30s
@@ -224,6 +196,7 @@ services:
         labels:
             description: "Node Exporter tool collects host-level metrics, including CPU, memory, and disk usage, which can be helpful for understanding the overall system resources available to your Docker containers."
             com.centurylinklabs.watchtower.enable: "true"
+            docker-volume-backup.stop-during-backup: "true"
         healthcheck:
           test: ["CMD-SHELL", "wget -q --spider http://localhost:9100/metrics || exit 1"]
           interval: 30s
