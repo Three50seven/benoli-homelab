@@ -1,3 +1,6 @@
-# Run once daily at the time in BACKUP_SCHEDULE - supercron will execute the schedule
-# by default supercron uses /bin/sh as the shell to execute commands instead of bash, so make sure to add '/usr/bin/env bash' before your command when bash is needed
-$BACKUP_SCHEDULE /usr/bin/env bash /app/scripts/run-backup.sh
+# Run at the specified time in BACKUP_SCHEDULE - supercronic will execute the schedule - see README at https://github.com/aptible/supercronic
+# Note: job labels help the preview-schedule.sh view each job with a label to help identify/verify it
+# job: backup-job
+$BACKUP_SCHEDULE /app/scripts/run-backup.sh
+# job: healthcheck-heartbeat
+0 0 * * * /app/scripts/healthcheck-heartbeat.sh

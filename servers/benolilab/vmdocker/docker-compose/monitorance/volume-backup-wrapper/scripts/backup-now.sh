@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Redirect logging to the docker compose log window so things like echo show in the docker compose logs
+exec >> /proc/1/fd/1 2>&1
+
 echo "[backup] Starting backup-now.sh..."
 
 # Volume assembly logic (as before)
@@ -26,7 +29,7 @@ ENV_ARGS=(
 
 # Label args (optional)
 LABEL_ARGS=(
-  "--label=description=Docker Volume Backup handles backing up named volumes within the host."
+  '--label=description="Docker Volume Backup handles backing up named volumes within the host."'
 )
 
 # Build final docker command

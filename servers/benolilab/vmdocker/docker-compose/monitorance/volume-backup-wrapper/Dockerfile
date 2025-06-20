@@ -1,6 +1,6 @@
 FROM alpine:3.20
 
-RUN apk add --no-cache bash curl docker-cli grep coreutils gettext && \
+RUN apk add --no-cache bash curl docker-cli grep coreutils gettext tzdata tini && \
     curl -sLo /usr/local/bin/supercronic https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-amd64 && \
     chmod +x /usr/local/bin/supercronic
 
@@ -17,4 +17,8 @@ RUN chmod +x ./scripts/*.sh
 # Add config directory for storing cron schedule
 RUN mkdir -p /app/config
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Create environment variable for the supercronic crontab schedule and heartbeat log
+ENV CRON_FILE=/app/config/backup.cron
+ENV HEARTBEAT_LOG=/tmp/heartbeat.log
+
+ENTRYPOINT ["/sbin/tini", "--", "/app/entrypoint.sh"]

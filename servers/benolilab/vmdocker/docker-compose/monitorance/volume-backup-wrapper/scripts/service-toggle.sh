@@ -1,5 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 set -e
+
+# Redirect logging to the docker compose log window so things like echo show in the docker compose logs
+exec >> /proc/1/fd/1 2>&1
 
 : "${BACKUP_SERVICES:=}"
 ACTION="$1"
@@ -10,20 +13,24 @@ if [ -z "$ACTION" ]; then
   exit 1
 fi
 
-IFS=','
+IFS=',' read -ra SERVICES <<< "$BACKUP_SERVICES"
 
-SERVICES_LIST=""
+sanitize() {
+  echo "$1" | tr -cd '[:print:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
 
-# Reverse only for start/restart actions
-if [ "$ACTION" = "start" ] || [ "$ACTION" = "restart" ]; then
-  REVERSED_LIST=""
-  for SERVICE in $BACKUP_SERVICES; do
-    REVERSED_LIST="$SERVICE ${REVERSED_LIST}"
+ORDERED_SERVICES=()
+
+if [[ "$ACTION" == "start" || "$ACTION" == "restart" ]]; then
+  for (( idx=${#SERVICES[@]}-1 ; idx>=0 ; idx-- )) ; do
+    CLEANED=$(sanitize "${SERVICES[$idx]}")
+    ORDERED_SERVICES+=("$CLEANED")
   done
-  # Rejoin with commas
-  SERVICES_LIST=$(echo "$REVERSED_LIST" | tr ' ' ',' | sed 's/,$//')
 else
-  SERVICES_LIST="$BACKUP_SERVICES"
+  for SERVICE in "${SERVICES[@]}"; do
+    CLEANED=$(sanitize "$SERVICE")
+    ORDERED_SERVICES+=("$CLEANED")
+  done
 fi
 
 get_restart_policy_label() {
@@ -44,7 +51,7 @@ restore_restart_policy() {
     fi
 }
 
-for SERVICE in $SERVICES_LIST; do
+for SERVICE in "${ORDERED_SERVICES[@]}"; do
   case "$ACTION" in
     start)
       echo "[service-toggle] - Starting $SERVICE..."

@@ -1,5 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+trap '' PIPE
+
+# Redirect logging to the docker compose log window so things like echo show in the docker compose logs
+exec >> /proc/1/fd/1 2>&1
 
 CONTAINERS="${QUIET_CONTAINERS:-immich-server}"
 QUIET_PERIOD="${QUIET_PERIOD:-60}"

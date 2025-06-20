@@ -367,6 +367,9 @@ _also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-h
 	# -i stands for "Interactive" - keeps STDIN open so you can type into the shell
 	# -t Allocates a pseudo-TTY, which makes the shell experience feel like you're on a real terminal
 
+	# Or try running with the entrypoint specified:
+		docker compose run --rm --entrypoint /app/entrypoint.sh volume-backup-wrapper
+
 	# Once inside the shell of the wrapper container, you can run this to test the backup scripts:
 		 /bin/sh -c '/app/scripts/run-backup.sh'
 
@@ -374,6 +377,9 @@ _also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-h
 
 	# To rebuild after changing the Dockerfile, or other internal files (e.g. scripts) run:
 		docker compose build --no-cache
+
+	# Or to rebuild with compose:
+		docker compose up -d --build volume-backup-wrapper
 
 	# To run shell inside the composed container and poke around, run:
 		docker compose exec volume-backup-wrapper sh
