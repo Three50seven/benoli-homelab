@@ -2,10 +2,16 @@ name: benolilab-docker
 secrets:
     plex_claim:
         file: ./secrets/.plex_claim    
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 services:   
     plex:
         container_name: plex
         image: linuxserver/plex
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.13
@@ -40,13 +46,14 @@ services:
             com.centurylinklabs.watchtower.enable: "true"
     nginx-proxy:
         container_name: nginx-proxy
-        environment:
-          - "DB_SQLITE_FILE=/config/database.sqlite"
-          - "DISABLE_IPV6=true"
         image: "jc21/nginx-proxy-manager:latest"
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.254
+        environment:
+          - "DB_SQLITE_FILE=/config/database.sqlite"
+          - "DISABLE_IPV6=true"
         ports:
            - '80:80'
            - '443:443'
@@ -68,6 +75,7 @@ services:
     adguardhome:
         container_name: adguardhome
         image: adguard/adguardhome
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.253
@@ -95,6 +103,7 @@ services:
     syncthing:
         container_name: syncthing
         image: lscr.io/linuxserver/syncthing:latest
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.15

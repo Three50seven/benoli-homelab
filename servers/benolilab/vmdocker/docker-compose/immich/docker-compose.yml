@@ -6,11 +6,17 @@ secrets:
         file: ./secrets/.immich_db_username
     immich_db_password:
         file: ./secrets/.immich_db_password
+x-logging: &default-logging
+    driver: json-file
+    options:
+        max-size: "10m"
+        max-file: "3"
 services:
     immich-server:
         user: "999:1002"  # Replace with the Immich user's UID/GID
         container_name: immich-server
         image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+        logging: *default-logging
         networks:
             server_net:
                 ipv4_address: 172.18.0.20
@@ -50,6 +56,7 @@ services:
         # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
         # Example tag: ${IMMICH_VERSION:-release}-cuda
         image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+        logging: *default-logging
         networks:
             server_net:
                 ipv4_address: 172.18.0.21
@@ -73,6 +80,7 @@ services:
     immich-redis:
         container_name: immich-redis
         image: docker.io/valkey/valkey:8-bookworm@sha256:ff21bc0f8194dc9c105b769aeabf9585fea6a8ed649c0781caeac5cb3c247884
+        logging: *default-logging
         networks:
             server_net:
                 ipv4_address: 172.18.0.22
@@ -91,6 +99,7 @@ services:
     immich-database:
         container_name: immich-database
         image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0@sha256:fa4f6e0971f454cd95fec5a9aaed2ed93d8f46725cc6bc61e0698e97dba96da1
+        logging: *default-logging
         networks:
             server_net:
                 ipv4_address: 172.18.0.23

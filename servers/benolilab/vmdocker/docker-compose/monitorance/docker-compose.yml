@@ -2,10 +2,16 @@ name: monitorance-docker
 secrets:    
     watchtower_discord_hook:
         file: ./secrets/.watchtower_discord_hook    
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 services:
     portainer:
         container_name: portainer
         image: "portainer/portainer-ce:alpine"
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.10
@@ -26,6 +32,7 @@ services:
     watchtower:
         container_name: watchtower
         image: containrrr/watchtower
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.11
@@ -74,6 +81,7 @@ services:
     uptime-kuma:
         container_name: uptime-kuma
         image: louislam/uptime-kuma:1
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.12
@@ -97,6 +105,7 @@ services:
     volume-backup-wrapper:
         build: ./volume-backup-wrapper
         container_name: volume-backup-wrapper
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.14
@@ -109,9 +118,9 @@ services:
         env_file:
             - ./backup.env
         environment:
-            DRY_RUN: true
-            DISABLE_CRON: false 
-        restart: unless-stopped
+            DRY_RUN: false
+            DISABLE_CRON: false
+        # restart: unless-stopped
         labels:
             description: "Wrapper container for the offen/docker-volume-backup immage.  It handles special cases where container-logs need to be checked prior to stopping them for backups (e.g. file synching processes that could be happening during a volume backup)."
             # com.docker.backup.restart-policy: {{match-to-docker-compose-restart-policy-value}} # Add this label to containers to store the original docker compose restart policy for applying back to the container after it is restarted after backups
@@ -124,6 +133,7 @@ services:
     grafana:
         container_name: grafana
         image: grafana/grafana
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.16
@@ -144,6 +154,7 @@ services:
     prometheus:
         container_name: prometheus
         image: prom/prometheus
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.17
@@ -165,6 +176,7 @@ services:
     cadvisor:
         container_name: cadvisor
         image: gcr.io/cadvisor/cadvisor
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.18
@@ -187,6 +199,7 @@ services:
     node-exporter:
         container_name: node-exporter
         image: prom/node-exporter
+        logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.19
