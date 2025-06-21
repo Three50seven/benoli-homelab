@@ -35,14 +35,15 @@ LABEL_ARGS=(
 # Build final docker command
 DOCKER_CMD=(docker run --rm --name docker-volume-backup)
 DOCKER_CMD+=("${VOLUME_ARGS[@]}" "${ENV_ARGS[@]}" "${LABEL_ARGS[@]}")
+DOCKER_CMD+=(--entrypoint backup)
 DOCKER_CMD+=(offen/docker-volume-backup:latest)
+
+# Show the full docker command in logs
+printf '[backup] Docker command: %q\n' "${DOCKER_CMD[@]}"
 
 # Dry-run check
 if [ "${DRY_RUN:-}" = "true" ]; then
-  echo "[backup] Dry run enabled - displaying full docker command:"
-  echo
-  printf '%q ' "${DOCKER_CMD[@]}"
-  echo
+  echo "[backup] Dry run enabled - the full docker command will not be executed and only displayed."  
 else
   echo "[backup] Executing docker-volume-backup..."
   "${DOCKER_CMD[@]}"
