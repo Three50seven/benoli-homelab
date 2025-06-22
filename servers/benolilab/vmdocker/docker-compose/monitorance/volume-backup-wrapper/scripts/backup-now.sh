@@ -32,14 +32,16 @@ LABEL_ARGS=(
   '--label=description="Docker Volume Backup handles backing up named volumes within the host."'
 )
 
-# Build final docker command
-DOCKER_CMD=(docker run --rm --name docker-volume-backup)
+# Build final docker command - note: this locks the volume-backup to a specific version - TODO: Make this an env. variable
+DOCKER_CMD=(docker run --rm)
 DOCKER_CMD+=("${VOLUME_ARGS[@]}" "${ENV_ARGS[@]}" "${LABEL_ARGS[@]}")
 DOCKER_CMD+=(--entrypoint backup)
-DOCKER_CMD+=(offen/docker-volume-backup:latest)
+DOCKER_CMD+=(offen/docker-volume-backup:v2)
 
 # Show the full docker command in logs
-printf '[backup] Docker command: %q\n' "${DOCKER_CMD[@]}"
+echo '[backup] Docker command:'
+printf '%q ' "${DOCKER_CMD[@]}"
+echo
 
 # Dry-run check
 if [ "${DRY_RUN:-}" = "true" ]; then
