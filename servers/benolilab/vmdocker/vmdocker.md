@@ -279,118 +279,128 @@ _also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-h
 	useradd -u 1001 -g 1001 -m -s /bin/bash syncthinguser
 
 ## Create backup directories for docker containers (-p option will ensure parent directories are also created):
-	```
-	mkdir -p /mnt/naspool/benolilab-docker/syncthingdata
-	```
+```
+mkdir -p /mnt/naspool/benolilab-docker/syncthingdata
+```
 ## Change owner and grant permissions to read/write for syncthinguser user on backup directory:
-	```
-	chown syncthinguser:syncthinguser -R /mnt/naspool/benolilab-docker/syncthingdata
-	chmod -R 770 /mnt/naspool/benolilab-docker/syncthingdata
-	```
+```
+chown syncthinguser:syncthinguser -R /mnt/naspool/benolilab-docker/syncthingdata
+chmod -R 770 /mnt/naspool/benolilab-docker/syncthingdata
+```
 ## Update the default folder settings 
-	- Go to GUI via web URL - https://[DOCKER_HOST_IP]:8384 > Actions > Settings > Click "Edit Folder Defaults" in "General" tab > Click "Advanced" tab
-	- Change folder settings to receive only
-	- Check box to "Ignore Permissions"
+- Go to GUI via web URL - https://[DOCKER_HOST_IP]:8384 > Actions > Settings > Click "Edit Folder Defaults" in "General" tab > Click "Advanced" tab
+- Change folder settings to receive only
+- Check box to "Ignore Permissions"
 
 ## When adding a new folder in Syncthing GUI:
-	- Create a new folder for each device's backups to keep syncing easier to manage.
-	- Make sure default settings are used (as mentioned/set above)
-	- Make sure to use the full folder path, i.e. /syncthingdata/new-folder-name
-	- Use lowercase kebab formatting e.g. new-folder-name	
+- Create a new folder for each device's backups to keep syncing easier to manage.
+- Make sure default settings are used (as mentioned/set above)
+- Make sure to use the full folder path, i.e. /syncthingdata/new-folder-name
+- Use lowercase kebab formatting e.g. new-folder-name	
 
 ## Verify that the UID/GID mapping in the Syncthing container is correct:
-	```
-	# Run the following on the Docker host (vmdocker):
-	id syncthinguser
-	# Output should be something like: uid=1001(syncthinguser) gid=1001(syncthinguser) groups=1001(syncthinguser)
+```
+# Run the following on the Docker host (vmdocker):
+id syncthinguser
+# Output should be something like: uid=1001(syncthinguser) gid=1001(syncthinguser) groups=1001(syncthinguser)
 	
-	# Run the same on Docker host and you should see a similar output (make sure the UID and GIDs are the same)
-	# Verify the owner is syncthinguser for the mnt
-	ls -ld /mnt/naspool/benolilab-docker/syncthingdata
+# Run the same on Docker host and you should see a similar output (make sure the UID and GIDs are the same)
+# Verify the owner is syncthinguser for the mnt
+ls -ld /mnt/naspool/benolilab-docker/syncthingdata
 	
-	# If it's not, change ownership:
-	chown -R 1001:1001 /mnt/naspool/benolilab-docker/syncthingdata
+# If it's not, change ownership:
+chown -R 1001:1001 /mnt/naspool/benolilab-docker/syncthingdata
 	
-	# Verify the UID/GID is used by the container:
-	docker logs syncthing | grep "User UID" && docker logs syncthing | grep "User GID"
-	# Expected output: User UID:    1001 && User GID:    1001
+# Verify the UID/GID is used by the container:
+docker logs syncthing | grep "User UID" && docker logs syncthing | grep "User GID"
+# Expected output: User UID:    1001 && User GID:    1001
 	
-	# NOTE: You may need to take it down and rebuild it restart it if changes are made
-	docker compose down syncthing
-	docker compose up --build -d syncthing
-	```
+# NOTE: You may need to take it down and rebuild it restart it if changes are made
+docker compose down syncthing
+docker compose up --build -d syncthing
+```
 
 # Immich - photo and video manager and backup service
-	- Add immichgroup Group && User (for managing immich service access to share without root access):
-	```
-	groupadd immichgroup
-	useradd -r -s /bin/false -g immichgroup immichuser
-	id immichuser # Get the user and group id for docker-compose.yml - see variable user:
-	```
-	- Create a storage directory for immich on the naspool and change owner to new user/group with rwx permissions:
-	```
-	mkdir -p /mnt/naspool/benolilab-docker/immichdata
-	chown -R immichuser:immichgroup /mnt/naspool/benolilab-docker/immichdata
-	chmod -R 770 /mnt/naspool/benolilab-docker/immichdata
-	```
-	- Create the docker-compose directory for the immich docker stack:
-	```
-	mkdir -p /opt/immich-docker
-	```
-	- Follow similar directions for running docker compose etc. for the immich compose file
-	```
-	cd /opt/immich-docker
-	docker ps -a
-	docker compose up -d
-	```
+- Add immichgroup Group && User (for managing immich service access to share without root access):
+```
+groupadd immichgroup
+useradd -r -s /bin/false -g immichgroup immichuser
+id immichuser # Get the user and group id for docker-compose.yml - see variable user:
+```
+- Create a storage directory for immich on the naspool and change owner to new user/group with rwx permissions:
+```
+mkdir -p /mnt/naspool/benolilab-docker/immichdata
+chown -R immichuser:immichgroup /mnt/naspool/benolilab-docker/immichdata
+chmod -R 770 /mnt/naspool/benolilab-docker/immichdata
+```
+- Create the docker-compose directory for the immich docker stack:
+```
+mkdir -p /opt/immich-docker
+```
+- Follow similar directions for running docker compose etc. for the immich compose file
+```
+cd /opt/immich-docker
+docker ps -a
+docker compose up -d
+```
 
 # Monitorance - Monitoring and Maintenance apps
-	- Create the docker-compose directory for the monitorance docker stack:
-	```
-	mkdir -p /opt/monitorance-docker
-	mkdir /opt/monitorance-docker/secrets
-	```
-	- Follow similar directions for running docker compose etc. for the monitorance compose file
-	```
-	cd /opt/monitorance-docker
-	docker ps -a
-	docker compose up -d
-	```
+- Create the docker-compose directory for the monitorance docker stack:
+```
+mkdir -p /opt/monitorance-docker
+mkdir /opt/monitorance-docker/secrets
+```
+- Follow similar directions for running docker compose etc. for the monitorance compose file
+```
+cd /opt/monitorance-docker
+docker ps -a
+docker compose up -d
+```
 
 # Create Docker Container called volume-backup-wrapper for custom volume backup scripts
-	- This is a wrapper container for the offen\docker-volume-backup container
-	```
-	# Test-drive the app - make sure DRY_RUN is set to true in backup.env file before running the run-backup.sh script if you just want to test the command output
-		docker compose run --rm -it volume-backup-wrapper /bin/sh
-	# breakdown of command: 
-	# -rm Automatically removes the container after it exits to prevent clutter with leftover containers
-	# -i stands for "Interactive" - keeps STDIN open so you can type into the shell
-	# -t Allocates a pseudo-TTY, which makes the shell experience feel like you're on a real terminal
+- This is a wrapper container for the offen\docker-volume-backup container
+```
+# Test-drive the app - make sure DRY_RUN is set to true in backup.env file before running the run-backup.sh script if you just want to test the command output
+	docker compose run --rm -it volume-backup-wrapper /bin/sh
+# breakdown of command: 
+# -rm Automatically removes the container after it exits to prevent clutter with leftover containers
+# -i stands for "Interactive" - keeps STDIN open so you can type into the shell
+# -t Allocates a pseudo-TTY, which makes the shell experience feel like you're on a real terminal
 
-	# Or try running with the entrypoint specified:
-		docker compose run --rm --entrypoint /app/entrypoint.sh volume-backup-wrapper
+# Or try running with the entrypoint specified:
+	docker compose run --rm --entrypoint /app/entrypoint.sh volume-backup-wrapper
 
-	# Once inside the shell of the wrapper container, you can run this to test the backup scripts:
-		 /bin/sh -c '/app/scripts/run-backup.sh'
+# Once inside the shell of the wrapper container, you can run this to test the backup scripts:
+		/bin/sh -c '/app/scripts/run-backup.sh'
 
-	# Type 'exit' to quit the container shell and destroy the temp container.
+# Type 'exit' to quit the container shell and destroy the temp container.
 
-	# To rebuild after changing the Dockerfile, or other internal files (e.g. scripts) run:
-		docker compose build --no-cache
+# To rebuild after changing the Dockerfile, or other internal files (e.g. scripts) run:
+	docker compose build --no-cache
 
-	# Or to rebuild with compose:
-		docker compose up -d --build volume-backup-wrapper
+# Or to rebuild with compose:
+	docker compose up -d --build volume-backup-wrapper
 
-	# To run shell inside the composed container and poke around, run:
-		docker compose exec volume-backup-wrapper sh
-	```
+# To run shell inside the composed container and poke around, run:
+	docker compose exec volume-backup-wrapper sh
+```
 
 # Removing special characters in text editor:
-	- Some special characters will cause some scripts to fail, so it's best to remove them
-	- Search for: [^\x00-\x7F]
-	- make sure to check or enable "use regular expressions"
+- Some special characters will cause some scripts to fail, so it's best to remove them
+- Search for: [^\x00-\x7F]
+- make sure to check or enable "use regular expressions"
 
 ## Also make sure line endings are Unix in shell scripts
-	- in Notepad++ you can open the file, and look in the bottom right corner to see if the file is Windows (CR LF) or Unix (LF)
-	- to convert to Unix (LF) open in Notepad++ and click Edit > EOL Conversion > Unix (LF)
-	- Save the file and upload to host machine needing/using the script
+- in Notepad++ you can open the file, and look in the bottom right corner to see if the file is Windows (CR LF) or Unix (LF)
+- to convert to Unix (LF) open in Notepad++ and click Edit > EOL Conversion > Unix (LF)
+- Save the file and upload to host machine needing/using the script
+
+# Spin up a test container with bash and curl and start up interactive shell:
+```
+	docker run -it --rm alpine:latest /bin/sh -c "apk add --no-cache bash curl grep coreutils gettext && /bin/sh"
+
+	# Example to add supercronic for testing custom volume-backup-wrapper
+    curl -sLo /usr/local/bin/supercronic https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-amd64 && \
+    chmod +x /usr/local/bin/supercronic
+```
+- Note: use 'apk add' manually, once inside the shell, to add any additional libraries or packages to the base Alpine OS.
