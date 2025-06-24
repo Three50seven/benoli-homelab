@@ -52,7 +52,7 @@ fi
 echo "[entrypoint] - Found $CRON_FILE. Previewing jobs:"
 cat "$CRON_FILE"
 
-echo "[entrypoint] - Validating cron syntax for: $CRON_FILE"
+echo "[entrypoint] - Validating cron syntax with supercronic TEST mode for: $CRON_FILE"
 if ! supercronic -test "$CRON_FILE"; then
     echo "[entrypoint] - Invalid cron file syntax - refusing to launch. Sleeping indefinitely for debugging purposes."
     sleep infinity
@@ -61,10 +61,13 @@ fi
 echo "[entrypoint] - Generating an entrypoint heartbeat (first log for healthcheck)"
 echo "$(date) healthcheck heartbeat" > $HEARTBEAT_LOG 2>&1
 
+echo "[entrypoint] - Running preview-schedule script:"
+"./scripts/preview-schedule.sh"
+
 if [ "$DISABLE_CRON" != "true" ]; then
-    echo "[entrypoint] - crontab file syntax looks good and cron (DISABLE_CRON) is enabled."
+    echo "[entrypoint] - crontab file syntax looks good and cron is enabled (DISABLE_CRON='$DISABLE_CRON')."
     echo "[entrypoint] - Launching cron scheduler. DRY_RUN is set to $DRY_RUN.  Make sure DRY_RUN is 'false' for the backups to properly execute."
-    echo "[entrypoint] - After scheduling, supercronic will wait for job to run..."
+    echo "[entrypoint] - After scheduling, supercronic will wait for the next job to run..."
     supercronic "$CRON_FILE"
 else
     echo "[entrypoint] - Cron disabled - sleeping indefinitely for debugging purposes"
