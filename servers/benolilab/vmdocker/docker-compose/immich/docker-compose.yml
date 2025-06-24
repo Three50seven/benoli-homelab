@@ -50,6 +50,7 @@ services:
         labels:
             description: "Immich is a self-hosted photo and video backup solution, using Docker containers."
             com.docker.backup.restart-policy: always
+            docker-volume-backup.stop-during-backup: "true"
             # com.centurylinklabs.watchtower.enable: "true"
     immich-machine-learning:
         container_name: immich-machine-learning
@@ -76,6 +77,7 @@ services:
         labels:
             description: "Immich leverages machine learning (ML) for features like facial recognition and smart search, using a separate machine learning service within its Docker environment."
             com.docker.backup.restart-policy: always
+            docker-volume-backup.stop-during-backup: "true"
             # com.centurylinklabs.watchtower.enable: "true"
     immich-redis:
         container_name: immich-redis
@@ -95,6 +97,7 @@ services:
         labels:
             description: "In Immich, Redis is used as an external service for caching and managing background tasks."
             com.docker.backup.restart-policy: always
+            docker-volume-backup.stop-during-backup: "true"
             # com.centurylinklabs.watchtower.enable: "true"
     immich-database:
         container_name: immich-database
@@ -126,6 +129,7 @@ services:
         labels:
             description: "Immich Database relies on PostgreSQL and is used to store the image references and metadata for Immich Server."
             com.docker.backup.restart-policy: always
+            docker-volume-backup.stop-during-backup: "true"
             # com.centurylinklabs.watchtower.enable: "true"
 volumes:
     immich_model_cache:
