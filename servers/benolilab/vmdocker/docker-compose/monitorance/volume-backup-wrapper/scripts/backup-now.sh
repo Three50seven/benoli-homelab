@@ -13,6 +13,11 @@ for vol in "${VOLS[@]}"; do
   VOLUME_ARGS+=("--volume" "${vol}:/backup/${vol}:ro")
 done
 
+# Manually mount secrets passed in as volumes from the host:
+VOLUME_ARGS+=("--volume" "${HOST_SSH_USER_FILE}:${SSH_USER_FILE}:ro")
+VOLUME_ARGS+=("--volume" "${HOST_SSH_PASSWORD_FILE}:${SSH_PASSWORD_FILE}:ro")
+VOLUME_ARGS+=("--volume" "${HOST_NOTIFICATION_URLS_FILE}:${NOTIFICATION_URLS_FILE}:ro")
+
 # Environment variables
 ENV_ARGS=(
   --env BACKUP_FILENAME
@@ -20,11 +25,11 @@ ENV_ARGS=(
   --env BACKUP_RETENTION_DAYS
   --env SSH_HOST_NAME
   --env SSH_PORT
-  --env SSH_USER_FILE
-  --env SSH_PASSWORD_FILE
+  --env SSH_USER_FILE="$SSH_USER_FILE"
+  --env SSH_PASSWORD_FILE="$SSH_PASSWORD_FILE"
   --env SSH_REMOTE_PATH
   --env NOTIFICATION_LEVEL
-  --env NOTIFICATION_URLS_FILE
+  --env NOTIFICATION_URLS_FILE="$NOTIFICATION_URLS_FILE"
 )
 
 # Label args (optional)
