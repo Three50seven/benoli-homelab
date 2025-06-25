@@ -383,6 +383,9 @@ docker compose up -d
 
 # To run shell inside the composed container and poke around, run:
 	docker compose exec volume-backup-wrapper sh
+
+# You can also run the full docker command that the wrapper generates or a snippit to make sure volumes, environment variables, etc. are being mounted properly:
+	docker run --rm -it --volume /var/run/docker.sock:/var/run/docker.sock:ro --volume "${HOST_SSH_USER_FILE}:${SSH_USER_FILE}:ro" --volume "${HOST_SSH_PASSWORD_FILE}:${SSH_PASSWORD_FILE}:ro" --volume "${HOST_NOTIFICATION_URLS_FILE}:${NOTIFICATION_URLS_FILE}:ro" --env BACKUP_FILENAME --env BACKUP_PRUNING_PREFIX --env BACKUP_RETENTION_DAYS --env SSH_HOST_NAME --env SSH_PORT --env SSH_USER_FILE="$SSH_USER_FILE" --env SSH_PASSWORD_FILE=${SSH_PASSWORD_FILE} --env SSH_REMOTE_PATH --env NOTIFICATION_LEVEL --env NOTIFICATION_URLS_FILE="$NOTIFICATION_URLS_FILE" alpine sh
 ```
 
 # Removing special characters in text editor:
