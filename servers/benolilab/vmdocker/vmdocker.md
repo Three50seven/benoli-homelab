@@ -359,6 +359,7 @@ docker compose up -d
 
 # Create Docker Container called volume-backup-wrapper for custom volume backup scripts
 - This is a wrapper container for the offen\docker-volume-backup container
+- Here are some common script commands for testing/debugging the docker container:
 ```
 # Test-drive the app - make sure DRY_RUN is set to true in backup.env file before running the run-backup.sh script if you just want to test the command output
 	docker compose run --rm -it volume-backup-wrapper /bin/sh
@@ -381,11 +382,71 @@ docker compose up -d
 # Or to rebuild with compose:
 	docker compose up -d --build volume-backup-wrapper
 
-# To run shell inside the composed container and poke around, run:
+# To run shell inside the composed container and examine file contents etc., run:
 	docker compose exec volume-backup-wrapper sh
 
 # You can also run the full docker command that the wrapper generates or a snippit to make sure volumes, environment variables, etc. are being mounted properly:
 	docker run --rm -it --volume /var/run/docker.sock:/var/run/docker.sock:ro --volume "${HOST_SSH_USER_FILE}:${SSH_USER_FILE}:ro" --volume "${HOST_SSH_PASSWORD_FILE}:${SSH_PASSWORD_FILE}:ro" --volume "${HOST_NOTIFICATION_URLS_FILE}:${NOTIFICATION_URLS_FILE}:ro" --env BACKUP_FILENAME --env BACKUP_PRUNING_PREFIX --env BACKUP_RETENTION_DAYS --env SSH_HOST_NAME --env SSH_PORT --env SSH_USER_FILE="$SSH_USER_FILE" --env SSH_PASSWORD_FILE=${SSH_PASSWORD_FILE} --env SSH_REMOTE_PATH --env NOTIFICATION_LEVEL --env NOTIFICATION_URLS_FILE="$NOTIFICATION_URLS_FILE" alpine sh
+```
+
+# Create Docker Container called zfs-backup for custom ZFS Pool backup scripts
+- This is a container for triggering the ZFS backup scripts on the NAS server.
+- NOTE: Make sure the zfs_backup.sh and secrets exist on the NAS server, as this container is dependent on these._
+- Generate a private ssh key:
+```
+ssh-keygen -t rsa -b 4096 -C "zfs-backup-key"
+# optionally use ed25519 instead of rsa if the NAS supports it, -C is used to label the key
+# when prompted, save or move the file to : /opt/monitorance-docker/secrets/.zfs_backup_ssh_key
+# leave the passphrase blank for automated backups (recommended ONLY if you're using Docker secrets or another secure mechanism to protect it)
+```
+Once the key is generated, copy the public key to the nas server:
+```
+ssh-copy-id -i /opt/monitorance-docker/secrets/.zfs_backup_ssh_key.pub youruser@nas-host
+# You should be required to enter the password for the SSH host to copy the public key to it's keychain
+```
+There is also a host fingerprint validation step, so make sure to add the host fingerprint to known_hosts in the '/opt/monitorance-docker/zfs-backup' path
+```
+# initialize the fingerprint - note to change the host IP in the following command to the proper NAS host: 
+ssh-keyscan -t rsa 192.168.1.100 > /opt/monitorance-docker/zfs-backup/known_hosts
+
+# Preview the fingerprint like so: 
+ssh-keyscan -t rsa 192.168.1.100 | ssh-keygen -lf -
+
+# You should see the full fingerprint and host metadata like so:
+# 3072 SHA256:fingerprintalphanumeric3435343/updateThisWithYourHostsFingerPrint 192.168.1.100 (RSA)
+# Copy this to the zfs_bcakup.env file variable: SSH_ZFS_HOST_FINGERPRINT
+```
+
+Here are some common script commands for testing/debugging the docker container:
+```
+# Test-drive the app - make sure DRY_RUN is set to true in the docker-compose file for the zfs-backup container
+	docker compose run --rm -it zfs-backup /bin/sh
+# breakdown of command: 
+# -rm Automatically removes the container after it exits to prevent clutter with leftover containers
+# -i stands for "Interactive" - keeps STDIN open so you can type into the shell
+# -t Allocates a pseudo-TTY, which makes the shell experience feel like you're on a real terminal
+
+# Or try running with the entrypoint specified:
+	docker compose run --rm --entrypoint /app/entrypoint.sh zfs-backup
+
+# Once inside the shell of the container, you can run this to test the backup scripts:
+		/bin/sh -c '/app/scripts/zfs-backup-trigger.sh'
+
+# Type 'exit' to quit the container shell and destroy the temp container.
+
+# To rebuild after changing the Dockerfile, or other internal files (e.g. scripts) run:
+	docker compose build --no-cache
+
+# Or to rebuild with compose:
+	docker compose up -d --build zfs-backup
+
+# To run shell inside the composed container and examine file contents etc., run:
+	docker compose exec zfs-backup sh
+
+# Once inside the container's shell, you can run a script like the following to test various output.  
+# Note, the ' >> /proc/1/fd/1 2>&1' part will redirect output to the docker logs and show in Portainer > logs for example.  
+# Leave ' >> /proc/1/fd/1 2>&1' off the command, if you want to just see output in the same console window you're running.
+scripts/zfs-backup-trigger.sh daily 7 >> /proc/1/fd/1 2>&1
 ```
 
 # Removing special characters in text editor:

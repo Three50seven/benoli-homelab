@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e
 
-CRON_TEMPLATE_FILE="/app/backup.cron"
-SCRIPT_FILE="/app/scripts/run-backup.sh"
-: "${CRON_FILE:=/app/config/backup.cron}"
+CRON_TEMPLATE_FILE="/app/zfs-backup.cron"
+SCRIPT_FILE="/app/scripts/zfs-backup-trigger.sh"
+: "${CRON_FILE:=/app/config/zfs-backup.cron}"
 : "${HEARTBEAT_LOG:=/tmp/heartbeat.log}"
 
 echo "[entrypoint] - Starting entrypoint"
 
 # Verify required binaries exist
-for bin in bash supercronic envsubst; do
+for bin in bash supercronic ssh; do
     if ! command -v "$bin" >/dev/null 2>&1; then
         echo "[entrypoint] - Required command not found: $bin"
         exit 1
@@ -22,19 +22,8 @@ until [ -f "$CRON_TEMPLATE_FILE" ]; do
     sleep 1
 done
 
-# Make sure the backup schedule is set and validate its format (rudimentary check - not bulletproof):
-if [ -z "$BACKUP_SCHEDULE" ]; then
-    echo "[entrypoint] - BACKUP_SCHEDULE environment variable is not set"
-    exit 1
-fi
-
-if ! echo "$BACKUP_SCHEDULE" | grep -Eq '^[0-9\*\/,-]+\s+[0-9\*\/,-]+\s+[0-9\*\/,-]+\s+[0-9\*\/,-]+\s+[0-9\*\/,-]+$'; then
-    echo "[entrypoint] - BACKUP_SCHEDULE doesn't appear to be a valid cron expression"
-    exit 1
-fi
-
-# Render environment variables into final cron file
-envsubst < "$CRON_TEMPLATE_FILE" > "$CRON_FILE"
+# Copy the CRON_TEMPLATE_FILE to the CRON_FILE location:
+cat "$CRON_TEMPLATE_FILE" > "$CRON_FILE"
 
 if [ -n "$(tail -c1 "$CRON_FILE")" ]; then
     echo "[entrypoint] - Cron file missing trailing newline - appending."

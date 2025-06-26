@@ -1,7 +1,13 @@
 name: monitorance-docker
 secrets:    
     watchtower_discord_hook:
-        file: ./secrets/.watchtower_discord_hook    
+        file: ./secrets/.watchtower_discord_hook
+    zfs_backup_ssh_key:
+        file: ./secrets/.zfs_backup_ssh_key
+    zfs_backup_ssh_user:
+        file: ./secrets/.zfs_backup_ssh_user
+    zfs_backup_ssh_host:
+        file: ./secrets/.zfs_backup_ssh_host    
 x-logging: &default-logging
   driver: json-file
   options:
@@ -112,11 +118,11 @@ services:
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock  # For control
         env_file:
-            - ./backup.env
+            - ./volume-backup-wrapper/backup.env
         environment:
             DRY_RUN: false
             DISABLE_CRON: false
-        # restart: unless-stopped
+        restart: unless-stopped
         labels:
             description: "Wrapper container for the offen/docker-volume-backup immage.  It handles special cases where container-logs need to be checked prior to stopping them for backups (e.g. file synching processes that could be happening during a volume backup)."
             # com.docker.backup.restart-policy: {{match-to-docker-compose-restart-policy-value}} # Add this label to containers to store the original docker compose restart policy for applying back to the container after it is restarted after backups
@@ -211,6 +217,35 @@ services:
           interval: 30s
           timeout: 10s
           retries: 3
+    zfs-backup:
+        build: ./zfs-backup
+        container_name: zfs-backup
+        logging: *default-logging
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.24
+        env_file:
+            - ./zfs-backup/zfs-backup.env
+        environment:
+            DRY_RUN: false
+            DISABLE_CRON: false
+            ZFS_BACKUP_SSH_KEY: /run/secrets/zfs_backup_ssh_key
+            ZFS_BACKUP_SSH_USER: /run/secrets/zfs_backup_ssh_user
+            ZFS_BACKUP_SSH_HOST: /run/secrets/zfs_backup_ssh_host
+        secrets:
+            - zfs_backup_ssh_key
+            - zfs_backup_ssh_user
+            - zfs_backup_ssh_host
+        restart: unless-stopped
+        labels:
+            description: "Wrapper container for running the ZFS snapshot and backup script on a ZFS pool.  NOTE: This container relies on a zfs_backup.sh and secrets to already exist on the ZFS pool host machine."
+            # com.docker.backup.restart-policy: {{match-to-docker-compose-restart-policy-value}} # Add this label to containers to store the original docker compose restart policy for applying back to the container after it is restarted after backups
+        healthcheck:
+          test: ["CMD-SHELL", "/app/scripts/healthcheck.sh"]
+          interval: 60s
+          timeout: 5s
+          retries: 3
+          start_period: 10s
 volumes:
     portainer_data:
         name: portainer_data
