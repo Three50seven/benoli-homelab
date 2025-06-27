@@ -17,6 +17,65 @@
 # When opening this file, make sure bottom-right status in Notepad++ says Unix (LF)
 # If it indicates Windows CRLF, convert it => open NotePad++, click Edit, Hover over EOL Conversion and select Unix (LF)
 
+print_help() {
+    cat <<EOF
+Usage: $0 [snapshot_type] [retention_period] [options]
+
+Positional Arguments:
+  snapshot_type         Type of snapshot to run. Valid options: daily, weekly, monthly, yearly
+  retention_period      Number of snapshots to retain for the given type. Use 0 to skip creating a snapshot
+
+Optional Flags:
+  -v, --verbose         Enable verbose output (echo messages to stdout)
+  -q, --quiet           Suppress stdout messages (log silently)
+  -t, --test            Run in TEST mode (default). No destructive actions performed
+      --live            Run in LIVE mode. Operations affecting ZFS pools will be executed
+  -h, --help            Display this help message and exit
+
+Configuration File:
+  The script expects a configuration file named zfs_backup_settings.conf to be present.
+  This file defines essential runtime parameters, such as:
+
+    - SOURCE_POOL: Primary ZFS pool where snapshots originate
+    - REQUIRED_POOLS: All pools involved in the backup and cleanup process. Note: even if a pool is offline, the script will need it to store its snapshot history.
+    - LOG_FILE, DISK_USAGE_LOG, etc.: Paths for log management
+    - LOG_FILE_LINES_TO_KEEP: Maximum lines to retain in log files
+    - LOG_DATE_FORMAT: Optional formatting can be passed, default is ISO 8601
+    - SKIP_LOG_FILE_MAINTENANCE: Set to "true" to skip log trimming
+    - BACKUP_POOL thresholds for disk space warning/critical levels
+    - Discord webhook path for alerts (relative to the script directory)
+
+  Make sure the Discord webhook is created and the path etc. is stored here:
+  Format of Webhook: https://discord.com/api/webhooks/[WEBHOOK_ID]/[UNIQUE_CODE]
+  (relative to the script directory)/secrets/.zfs_backups_discord_webhook"
+
+  The script automatically detects the active BACKUP_POOL from available devices 
+  matching the pattern "naspool_backup*", and selects the first valid match for sending snapshots.
+
+Current Configuration (values read from $CONFIG_FILE):
+  SOURCE_POOL                 = $SOURCE_POOL
+  REQUIRED_POOLS              = ${REQUIRED_POOLS[*]}
+  LOG_FILE                    = $LOG_FILE
+  DISK_USAGE_LOG              = $DISK_USAGE_LOG
+  SNAPSHOT_TRANSFER_HISTORY_LOG = $SNAPSHOT_TRANSFER_HISTORY_LOG
+  LOG_FILE_LINES_TO_KEEP      = $LOG_FILE_LINES_TO_KEEP
+  SKIP_LOG_FILE_MAINTENANCE   = $SKIP_LOG_FILE_MAINTENANCE
+  MAX_RETENTION_PERIODS       = $MAX_RETENTION_PERIODS
+  BACKUP_POOL WARNING         = ${BACKUP_POOL_SIZE_WARNING_THRESHOLD}GB
+  BACKUP_POOL CRITICAL        = ${BACKUP_POOL_CRITICAL_THRESHOLD}GB
+  SOURCE_POOL WARNING         = ${SOURCE_POOL_SIZE_WARNING_THRESHOLD}GB
+  SOURCE_POOL CRITICAL        = ${SOURCE_POOL_CRITICAL_THRESHOLD}GB
+  LOG_DATE_FORMAT             = $LOG_DATE_FORMAT
+
+Examples:
+  $0 daily 7 -v           Run a daily backup keeping 7 snapshots with verbose output - default will be test mode
+  $0 monthly 4 --live     Run a live monthly backup retaining 4 snapshots
+  $0 weekly 0 -q          Skip weekly snapshot (retention = 0), quiet mode
+  $0 daily 7 -vt          Run a daily backup keeping 7 snapshots with verbose output and in test mode only, so that no snapshot is created and no destructive actions are performed.
+
+EOF
+}
+
 # Load config file
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 CONFIG_FILE="$SCRIPT_DIR/zfs_backup_settings.conf"
@@ -35,13 +94,83 @@ fi
 echo "Info: Sourcing variables from config file after checking if it exists and is readable:"
 source "$CONFIG_FILE"
 
+# Positional Arguments:
 # Get the snapshot type - this will be sent from the Cron job
 # Valid options are: daily|weekly|monthly|yearly
-SNAP_TYPE="$1"
+SNAP_TYPE=""
 
 # Snapshot retention periods
 # If zero (0) - a snapshot will not be taken for that period
-RETENTION_PERIOD="$2"
+RETENTION_PERIOD=""
+
+# Default values
+VERBOSE="false"
+QUIET="false"
+IS_TEST="true"  # default
+TEST_MODE_SET=""
+LIVE_MODE_SET=""
+
+# Parse the opations:
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            print_help
+            exit 0
+            ;;
+        --verbose)
+            VERBOSE="true"
+            shift
+            ;;
+        --quiet)
+            QUIET="true"
+            shift
+            ;;
+        --test)
+            IS_TEST="true"
+            TEST_MODE_SET="true"
+            shift
+            ;;
+        --live)
+            IS_TEST="false"
+            LIVE_MODE_SET="true"
+            shift
+            ;;
+        -[a-zA-Z]*)
+            # Loop over each character in the combined flag (e.g. -vq)
+            for (( i=1; i<${#1}; i++ )); do
+                char="${1:$i:1}"
+                case "$char" in
+                    v) VERBOSE="true" ;;
+                    q) QUIET="true" ;;
+                    t) IS_TEST="true"; TEST_MODE_SET="true" ;;
+                    *) echo "Unknown flag: -$char"; exit 1 ;;
+                esac
+            done
+            shift
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+        *)
+            if [[ -z "$SNAP_TYPE" ]]; then
+                SNAP_TYPE="$1"
+            elif [[ -z "$RETENTION_PERIOD" ]]; then
+                RETENTION_PERIOD="$1"
+            else
+                echo "Unexpected argument: $1"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check for conflict in run modes live|test
+if [[ "$TEST_MODE_SET" == "true" && "$LIVE_MODE_SET" == "true" ]]; then
+    echo "Error: Cannot use --test and --live together. Choose one."
+    exit 1
+fi
 
 ensure_log_files_exist() {
     for path in "$LOG_FILE" "$DISK_USAGE_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG"; do
@@ -64,42 +193,63 @@ ensure_log_files_exist() {
 # Function to log messages
 log_message() {
     local message="$1"
-    echo -e "$(date +"$LOG_DATE_FORMAT") - $message" | tee -a "$LOG_FILE"
+    local timestamped_msg="$(date +"$LOG_DATE_FORMAT") - $message"
+
+    # Always write to log file
+    echo -e "$timestamped_msg" >> "$LOG_FILE"
+
+    # Echo to stdout only if verbose is enabled and quiet is not
+    if [[ "$VERBOSE" == "true" && "$QUIET" != "true" ]]; then
+        echo -e "$timestamped_msg"
+    fi
 }
 
-# Function to trim log files - manage their size and keep them from continuously growing
 trim_log_files() {
-    local LOG_FILES=("$LOG_FILE" "$DISK_USAGE_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG")
+    if [[ "$SKIP_LOG_FILE_MAINTENANCE" == "false" ]]; then
+        local LOG_FILES=("$LOG_FILE" "$DISK_USAGE_LOG" "$SNAPSHOT_TRANSFER_HISTORY_LOG")
+        local MIN_LOG_LINES=100
+        local MAX_LOG_LINES=50000
+        local TRIM_NOTICE_PATTERN=" - Info: Previous log entries trimmed to maintain file size."
+        local TRIM_NOTICE="$(date +"$LOG_DATE_FORMAT")$TRIM_NOTICE_PATTERN"
 
-    # Validate LOG_FILE_LINES_TO_KEEP to prevent errors
-    if ! echo "$LOG_FILE_LINES_TO_KEEP" | grep -qE '^[0-9]+$'; then
-        log_message "Error: LOG_FILE_LINES_TO_KEEP must be a valid number. Found: $LOG_FILE_LINES_TO_KEEP"
-        exit 1
-    fi
-
-    for LOCAL_LOG_FILE in "${LOG_FILES[@]}"; do
-        if [[ -f "$LOCAL_LOG_FILE" ]]; then
-            log_message "Info: Trimming $LOCAL_LOG_FILE to keep last $LOG_FILE_LINES_TO_KEEP lines."
-
-            # Create a temporary trimmed log file with a header indicating previous entries were removed
-            echo "$(date +"$LOG_DATE_FORMAT") - Info: Previous log entries trimmed to maintain file size." > "$LOCAL_LOG_FILE.tmp"
-
-            # Append the last N lines after the notice and handle errors
-            if ! tail -n "$LOG_FILE_LINES_TO_KEEP" "$LOCAL_LOG_FILE" >> "$LOCAL_LOG_FILE.tmp"; then
-                log_message "Error: Failed to retrieve log content from $LOCAL_LOG_FILE"
-                continue  # Skip replacement if tail fails
-            fi
-
-            # Replace original log file with the trimmed version
-            if mv "$LOCAL_LOG_FILE.tmp" "$LOCAL_LOG_FILE"; then
-                log_message "Info: Successfully trimmed $LOCAL_LOG_FILE"
-            else
-                log_message "Error: Failed to replace $LOCAL_LOG_FILE with trimmed version"
-            fi
-        else
-            log_message "Warning: Log file $LOCAL_LOG_FILE does not exist-skipping trim."
+        if ! echo "$LOG_FILE_LINES_TO_KEEP" | grep -qE '^[0-9]+$'; then
+            log_message "Error: LOG_FILE_LINES_TO_KEEP must be a valid number. Found: $LOG_FILE_LINES_TO_KEEP"
+            exit 1
+        elif (( LOG_FILE_LINES_TO_KEEP < MIN_LOG_LINES || LOG_FILE_LINES_TO_KEEP > MAX_LOG_LINES )); then
+            log_message "Error: LOG_FILE_LINES_TO_KEEP ($LOG_FILE_LINES_TO_KEEP) must be between $MIN_LOG_LINES and $MAX_LOG_LINES."
+            exit 1
         fi
-    done
+
+        for LOCAL_LOG_FILE in "${LOG_FILES[@]}"; do
+            if [[ -f "$LOCAL_LOG_FILE" ]]; then
+                local CURRENT_LINES
+                CURRENT_LINES=$(wc -l < "$LOCAL_LOG_FILE")
+
+                if (( CURRENT_LINES > LOG_FILE_LINES_TO_KEEP )); then
+                    log_message "Info: Trimming log file ($LOCAL_LOG_FILE). Current lines: $CURRENT_LINES. Keeping: $LOG_FILE_LINES_TO_KEEP."
+
+                    # Get the last N lines (excluding any previous trim notice)
+                    tail -n "$LOG_FILE_LINES_TO_KEEP" "$LOCAL_LOG_FILE" | \
+                        sed "1{/$(printf '%s\n' "$TRIM_NOTICE_PATTERN" | sed 's/[^^]/[&]/g; s/\^/\\^/g')/d}" > "$LOCAL_LOG_FILE.tmp"
+
+                    # Prepend the updated trim notice
+                    echo "$TRIM_NOTICE" | cat - "$LOCAL_LOG_FILE.tmp" > "$LOCAL_LOG_FILE.trimmed" && mv "$LOCAL_LOG_FILE.trimmed" "$LOCAL_LOG_FILE"
+
+                    if [[ $? -eq 0 ]]; then
+                        log_message "Info: Successfully trimmed $LOCAL_LOG_FILE"
+                    else
+                        log_message "Error: Failed to replace $LOCAL_LOG_FILE with trimmed version"
+                    fi
+                else
+                    log_message "Info: Log file has $CURRENT_LINES lines. No trimming needed."
+                fi
+            else
+                log_message "Warning: Log file $LOCAL_LOG_FILE does not exist-skipping trim."
+            fi
+        done
+    else
+        log_message "Info: Skipping log file maintenance."
+    fi
 }
 
 echo "Info: Ensuring log files exist and are writable."
@@ -114,10 +264,8 @@ if ! date +"$LOG_DATE_FORMAT" &>/dev/null; then
 fi
 
 # Safety flag for running just a test without impacting the ZFS pools - only runs in "LIVE" mode when set to "false" in config - Default is true
-IS_TEST=true
-if [[ "$IS_TEST_STRING" == "false" ]]; then
+if [[ "$IS_TEST" == "false" ]]; then
     log_message "Info: Running in LIVE mode - backup operations will proceed normally."
-    IS_TEST=false
 else
     log_message "Info: Running in TEST mode - no destructive operations will be performed."
 fi
@@ -136,7 +284,6 @@ $(printf "| %-40s | %-35s |\n" "Variable" "Value")
 $(printf "+-%-40s-+-%-35s-+\n" "$(printf '%0.s-' {1..40})" "$(printf '%0.s-' {1..35})")
 $(printf "| %-40s | %-35s |\n" "SNAP_TYPE" "$SNAP_TYPE")
 $(printf "| %-40s | %-35s |\n" "RETENTION_PERIOD" "$RETENTION_PERIOD")
-$(printf "| %-40s | %-35s |\n" "IS_TEST_STRING" "$IS_TEST_STRING")
 $(printf "| %-40s | %-35s |\n" "IS_TEST" "$IS_TEST")
 $(printf "| %-40s | %-35s |\n" "SOURCE_POOL" "$SOURCE_POOL")
 $(printf "| %-40s | %-35s |\n" "BACKUP_POOL" "$BACKUP_POOL")
@@ -156,23 +303,7 @@ $(printf "| %-40s | %-35s |\n" "LOG_DATE_FORMAT" "$LOG_DATE_FORMAT")
 "
 
 # Check log maintenance variables only if maintenance is done/needed
-if [[ "$SKIP_LOG_FILE_MAINTENANCE" == "false" ]] then
-    MIN_LOG_LINES=100  # Minimum log lines allowed
-    MAX_LOG_LINES=50000  # Maximum log lines allowed
-
-    if ! echo "$LOG_FILE_LINES_TO_KEEP" | grep -qE '^[0-9]+$'; then
-        log_message "Error: LOG_FILE_LINES_TO_KEEP must be numeric. Found: $LOG_FILE_LINES_TO_KEEP"
-        exit 1
-    elif (( LOG_FILE_LINES_TO_KEEP < MIN_LOG_LINES || LOG_FILE_LINES_TO_KEEP > MAX_LOG_LINES )); then
-        log_message "Error: LOG_FILE_LINES_TO_KEEP ($LOG_FILE_LINES_TO_KEEP) must be between $MIN_LOG_LINES and $MAX_LOG_LINES."
-        exit 1
-    fi
-
-    log_message "Info: Running log file maintenance."
-    trim_log_files
-else
-    log_message "Info: Skipping log file maintenance."
-fi
+trim_log_files
 
 # Attempt to Read webhook URL from the file specified in the variable
 if [[ -f "$WEBHOOK_FILE" ]]; then
@@ -356,7 +487,7 @@ if [ "$RETENTION_PERIOD" -ne 0 ]; then
     if zfs list -t snapshot -o name | grep -q "$SNAP_NAME"; then
         log_message "Info: Skipping snapshot creation - snapshot $SNAP_NAME already exists."
     else
-        if [ "$IS_TEST" = false ]; then
+        if [[ "$IS_TEST" == "false" ]]; then
             zfs snapshot -r "$SNAP_NAME"
             log_message "Info: Created $SNAP_TYPE snapshot: $SNAP_NAME"            
         else
@@ -397,7 +528,7 @@ if zfs list -H -t snapshot -o name | grep -q "^$SOURCE_POOL@$SNAP_ENDING" && \
     log_message "Info: Snapshot $SNAP_ENDING already exists in both pools (source pool: $SOURCE_POOL and backup pool: $BACKUP_POOL). Skipping send."    
 else    
     if [ -n "$LAST_SNAP_BACKUP_POOL" ]; then
-        if [ "$IS_TEST" = false ]; then            
+        if [[ "$IS_TEST" == "false" ]]; then            
             log_message "Info: Sending incremental snapshot from $LAST_SNAP_BACKUP_POOL to $SNAP_NAME to backup pool: $BACKUP_POOL."
             zfs send -R -I "$LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP" "$SNAP_NAME" | zfs receive -Fdu "$BACKUP_POOL"
             
@@ -414,7 +545,7 @@ else
             log_message "Info: Here's the command if running in 'LIVE' mode: zfs send -R -I ${LAST_SNAP_SOURCE_POOL_SENT_TO_BACKUP} ${SNAP_NAME} | zfs receive -Fdu ${BACKUP_POOL}"
         fi
     else
-        if [ "$IS_TEST" = false ]; then
+        if [[ "$IS_TEST" == "false" ]]; then
             log_message "Info: Sending full snapshot $SNAP_NAME to backup pool: $BACKUP_POOL."
             zfs send -R "$SNAP_NAME" | zfs receive -Fdu "$BACKUP_POOL"
             
@@ -476,7 +607,7 @@ cleanup_snapshots() {
             # Final deletion logic
             if [[ "$safe_to_delete" == true && $(snapshot_sent_to_all_pools "$SNAP") == true ]]; then
                 log_message "Info: Safe to delete snapshot $SNAP."
-                if [[ "$IS_TEST" == false ]]; then
+                if [[ "$IS_TEST" == "false" ]]; then
                     zfs destroy -r "$SNAP"
                     log_message "Info: Snapshot $SNAP destroyed-record retained in history log ($SNAPSHOT_TRANSFER_HISTORY_LOG)."
                 else
@@ -517,7 +648,7 @@ $(zfs list -r -o name,used,available "$SOURCE_POOL" | column -t)
 $(zfs list -r -o name,used,available "$BACKUP_POOL" | column -t)"
 
 # send message 
-if [ "$IS_TEST" = false ]; then
+if [[ "$IS_TEST" == "false" ]]; then
     # Verify snapshot exists in backup pool
     log_message "Info: Verifying snapshot $SNAP_ENDING in backup pool $BACKUP_POOL."
     if zfs list -H -t snapshot -o name | grep -q "^$BACKUP_POOL@$SNAP_ENDING"; then
