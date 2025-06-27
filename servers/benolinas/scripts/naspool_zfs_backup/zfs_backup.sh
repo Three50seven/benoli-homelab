@@ -241,7 +241,7 @@ trim_log_files() {
                         log_message "Error: Failed to replace $LOCAL_LOG_FILE with trimmed version"
                     fi
                 else
-                    log_message "Info: Log file has $CURRENT_LINES lines. No trimming needed."
+                    log_message "Info: Log file ($LOCAL_LOG_FILE) has $CURRENT_LINES lines. No trimming needed."
                 fi
             else
                 log_message "Warning: Log file $LOCAL_LOG_FILE does not exist-skipping trim."
