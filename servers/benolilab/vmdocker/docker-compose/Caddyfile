@@ -1,4 +1,4 @@
 :80 {
-    root * /wwwroot
+    root * /wwwroot/caddy
     file_server
 }
