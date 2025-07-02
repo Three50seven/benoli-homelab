@@ -257,11 +257,14 @@ volumes:
         name: prometheus_data
     prometheus_config:
         name: prometheus_config
-    caddy_data:
-        name: caddy_data
+    nginx_proxy_config:
+        name: nginx_proxy_config
         external: true # defined in docker-compose/docker-compose.yml
-    caddy_config:
-        name: caddy_config
+    nginx_proxy_letsencrypt:
+        name: nginx_proxy_letsencrypt
+        external: true # defined in docker-compose/docker-compose.yml
+    nginx_proxy_data:
+        name: nginx_proxy_data
         external: true # defined in docker-compose/docker-compose.yml
     adguard_work:
         name: adguard_work

@@ -43,53 +43,6 @@ services:
             - plex_claim
         labels:
             description: "Plex organizes video, music and photos from personal media libraries and streams them to smart TVs, streaming boxes and mobile devices."
-            com.centurylinklabs.watchtower.enable: "true"
-    caddy:
-        container_name: caddy
-        image: caddy:latest
-        logging: *default-logging
-        networks:
-          server_net:
-            ipv4_address: 172.18.0.250
-        ports:
-            - "80:80"
-            - "443:443"
-        restart: always
-        volumes:
-            - ./Caddyfile:/etc/caddy/Caddyfile
-            - ./caddy-sites/wwwroot:/wwwroot
-            - ./caddy-sites/certs:/certs:ro
-            - caddy_data:/data
-            - caddy_config:/config
-        healthcheck:
-              test: ["CMD-SHELL", "wget --spider -q http://localhost || exit 1"]
-              interval: 1m30s
-              timeout: 30s
-              retries: 5
-        labels:
-            description: "Caddy is a powerful, enterprise-ready, open source web server with automatic HTTPS written in Go."
-            com.centurylinklabs.watchtower.enable: "true"
-    caddy-ui:
-        container_name: caddy-ui
-        image: qmcgaw/caddy-ui
-        restart: unless-stopped
-        ports:
-            - "8000:8000"
-        environment:
-            - CADDY_API_ENDPOINT=http://caddy:2019
-            - TZ=Etc/UTC
-        depends_on:
-            - caddy
-        networks:
-            server_net:
-                ipv4_address: 172.18.0.251
-        healthcheck:
-              test: ["CMD-SHELL", "wget --spider -q http://localhost:8000 || exit 1"]
-              interval: 1m30s
-              timeout: 30s
-              retries: 5
-        labels:
-            description: "Caddy-UI is an open-source user interface for managing and interfacing with Caddy."
             com.centurylinklabs.watchtower.enable: "true"    
     adguardhome:
         container_name: adguardhome
@@ -119,6 +72,34 @@ services:
             interval: 10s
             timeout: 30s
             retries: 3
+    nginx-proxy:
+        container_name: nginx-proxy
+        image: "jc21/nginx-proxy-manager:latest"
+        logging: *default-logging
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.254
+        environment:
+          - "DB_SQLITE_FILE=/config/database.sqlite"
+          - "DISABLE_IPV6=true"
+        ports:
+           - '80:80'
+           - '443:443'
+           - '81:81'
+           - '853:853'
+        restart: "unless-stopped"
+        volumes:
+          - "nginx_proxy_config:/config"
+          - "nginx_proxy_letsencrypt:/etc/letsencrypt"
+          - "nginx_proxy_data:/data"
+        labels:
+            description: "Nginx, pronounced 'engine-x,' is a versatile open-source software that acts as a web server, reverse proxy, load balancer, and more."
+            com.centurylinklabs.watchtower.enable: "true"
+            docker-volume-backup.stop-during-backup: "true"
+        healthcheck:
+          test: ["CMD", "/bin/check-health"]
+          interval: 10s
+          timeout: 3s
     syncthing:
         container_name: syncthing
         image: lscr.io/linuxserver/syncthing:latest
@@ -151,10 +132,12 @@ services:
           timeout: 10s
           retries: 3
 volumes:
-    caddy_data:
-        name: caddy_data
-    caddy_config:
-        name: caddy_config
+    nginx_proxy_config:
+        name: nginx_proxy_config
+    nginx_proxy_letsencrypt:
+        name: nginx_proxy_letsencrypt
+    nginx_proxy_data:
+        name: nginx_proxy_data
     adguard_work:
         name: adguard_work
     adguard_conf:

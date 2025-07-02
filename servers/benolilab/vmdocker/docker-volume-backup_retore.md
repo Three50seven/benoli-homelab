@@ -57,8 +57,9 @@ docker run -d --name temp_restore_container \
 -v plex_server_media:/backup_restore/plex_server_media \
 -v portainer_data:/backup_restore/portainer_data \
 -v uptime_kuma_data:/backup_retore/uptime_kuma_data \
--v caddy_config:/backup_restore/caddy_config \
--v caddy_data:/backup_restore/caddy_data \
+-v nginx_proxy_config:/backup_restore/nginx_proxy_config \
+-v nginx_proxy_letsencrypt:/backup_restore/nginx_proxy_letsencrypt \
+-v nginx_proxy_data:/backup_restore/nginx_proxy_data \
 -v adguard_work:/backup_restore/adguard_work \
 -v adguard_conf:/backup_restore/adguard_conf \
 alpine
@@ -68,8 +69,9 @@ docker cp /tmp/backup/plex_server_transcode/. temp_restore_container:/backup_res
 docker cp /tmp/backup/plex_server_media/. temp_restore_container:/backup_restore/plex_server_media
 docker cp /tmp/backup/portainer_data/. temp_restore_container:/backup_restore/portainer_data
 docker cp /tmp/backup/uptime_kuma_data/. temp_restore_container:/backup_restore/uptime_kuma_data
-docker cp /tmp/backup/caddy_config/. temp_restore_container:/backup_restore/caddy_config
-docker cp /tmp/backup/caddy_data/. temp_restore_container:/backup_restore/caddy_data
+docker cp /tmp/backup/nginx_proxy_config/. temp_restore_container:/backup_restore/nginx_proxy_config
+docker cp /tmp/backup/nginx_proxy_letsencrypt/. temp_restore_container:/backup_restore/nginx_proxy_letsencrypt
+docker cp /tmp/backup/nginx_proxy_data/. temp_restore_container:/backup_restore/nginx_proxy_data
 docker cp /tmp/backup/adguard_work/. temp_restore_container:/backup_restore/adguard_work
 docker cp /tmp/backup/adguard_conf/. temp_restore_container:/backup_restore/adguard_conf
 
