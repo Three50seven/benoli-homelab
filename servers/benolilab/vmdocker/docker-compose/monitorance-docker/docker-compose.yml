@@ -259,38 +259,38 @@ volumes:
         name: prometheus_config
     nginx_proxy_config:
         name: nginx_proxy_config
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     nginx_proxy_letsencrypt:
         name: nginx_proxy_letsencrypt
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     nginx_proxy_data:
         name: nginx_proxy_data
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     adguard_work:
         name: adguard_work
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     adguard_conf:
         name: adguard_conf
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     plex_server_config:
         name: plex_server_config
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     plex_server_transcode:
         name: plex_server_transcode
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     plex_server_media:
         name: plex_server_media
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     syncthing_config:
         name: syncthing_config
-        external: true # defined in docker-compose/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml
     immich_pgdata:
-        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
+        external: true # prevent from defining again since volume is defined in immich-docker/docker-compose.yml
     immich_model_cache:
-        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
+        external: true # prevent from defining again since volume is defined in immich-docker/docker-compose.yml
     immich_redis_data:
-        external: true # prevent from defining again since volume is defined in immich/docker-compose.yml
+        external: true # prevent from defining again since volume is defined in immich-docker/docker-compose.yml
 networks:
     server_net:
         name: server_net
-        external: true # prevent from defining again since volume is defined in docker-compose/docker-compose.yml
+        external: true # prevent from defining again since volume is defined in benolilab-docker/docker-compose.yml
