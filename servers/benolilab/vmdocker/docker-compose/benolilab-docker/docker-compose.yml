@@ -81,7 +81,6 @@ services:
             ipv4_address: 172.18.0.254
         environment:
           - "DB_SQLITE_FILE=/config/database.sqlite"
-          - "DISABLE_IPV6=true"
         ports:
            - '80:80'
            - '443:443'
