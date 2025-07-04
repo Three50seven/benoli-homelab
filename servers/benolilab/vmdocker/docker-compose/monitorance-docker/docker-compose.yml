@@ -139,8 +139,8 @@ services:
         networks:
           server_net:
             ipv4_address: 172.18.0.16
-        ports:
-          - "3002:3000"
+        expose:
+          - "3000"
         volumes:
           - grafana_data:/var/lib/grafana
         restart: unless-stopped
@@ -160,11 +160,16 @@ services:
         networks:
           server_net:
             ipv4_address: 172.18.0.17
-        ports:
-          - "9090:9090"
+        depends_on:
+            cadvisor:
+                condition: service_healthy
+            node-exporter:
+                condition: service_healthy
+        expose:
+          - "9090"
         volumes:
-          - prometheus_data:/etc/prometheus
-          - prometheus_config:/prometheus
+          - prometheus_data:/prometheus
+          - ./prometheus:/etc/prometheus:ro
         restart: unless-stopped
         labels:
             description: "Prometheus is a popular monitoring and alerting system. You'll need to set it up to collect Docker container metrics, including memory usage."
@@ -177,17 +182,18 @@ services:
           retries: 3
     cadvisor:
         container_name: cadvisor
-        image: gcr.io/cadvisor/cadvisor
+        image: gcr.io/cadvisor/cadvisor:latest
         logging: *default-logging
         networks:
           server_net:
             ipv4_address: 172.18.0.18
-        ports:
-          - "8081:8080"
+        expose:
+          - "8080"
         volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-          - /sys:/sys
-          - /var/lib/docker/:/var/lib/docker
+            - /:/rootfs:ro
+            - /var/run:/var/run:ro
+            - /sys:/sys:ro
+            - /var/lib/docker/:/var/lib/docker:ro
         restart: unless-stopped
         labels:
             description: "cAdvisor (Container Advisor) is a tool that provides detailed resource usage information for containers. It can be used alongside Prometheus to gather even more granular data."
@@ -205,8 +211,17 @@ services:
         networks:
           server_net:
             ipv4_address: 172.18.0.19
-        ports:
-          - "9100:9100"
+        expose:
+          - "9100"
+        pid: "host"
+        command:
+            - '--path.procfs=/host/proc'
+            - '--path.sysfs=/host/sys'
+            - '--path.rootfs=/rootfs'
+        volumes:
+            - /proc:/host/proc:ro
+            - /sys:/host/sys:ro
+            - /:/rootfs:ro 
         restart: unless-stopped
         labels:
             description: "Node Exporter tool collects host-level metrics, including CPU, memory, and disk usage, which can be helpful for understanding the overall system resources available to your Docker containers."
@@ -255,8 +270,6 @@ volumes:
         name: grafana_data
     prometheus_data:
         name: prometheus_data
-    prometheus_config:
-        name: prometheus_config
     nginx_proxy_config:
         name: nginx_proxy_config
         external: true # defined in benolilab-docker/docker-compose.yml
