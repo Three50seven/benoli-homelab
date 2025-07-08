@@ -22,17 +22,23 @@ Finish and start VM - run through Debian install
 hostname: vmdocker.krimmhouse.local
 
 # Install and check SSH server:
+```
 apt install openssh-server
 systemctl status ssh
+```
 
 # Permit SSH Root login:
+```
 nano /etc/ssh/sshd_config
+```
 Find # Authentication: section > PermitRootLogin
 Remove "#" from line that says PermitRootLogin and change value to "yes"
 exit and save the nano editor
 
 # Setup Debian apt sources:
-sudo nano /etc/apt/sources.list
+```
+nano /etc/apt/sources.list
+```
  - view latest: https://wiki.debian.org/SourcesList
  - e.g. (comment out deb cdrom line)
 deb-src http://deb.debian.org/debian bookworm main non-free-firmware
@@ -44,17 +50,23 @@ deb http://deb.debian.org/debian bookworm-updates main non-free-firmware
 deb-src http://deb.debian.org/debian bookworm-updates main non-free-firmware
 
 # Update Debian installation:
+```
 apt update
 apt upgrade
+```
 
 # Set static IP on Debian 12 VM (note you'll need root user for this):
 https://www.linuxtechi.com/configure-static-ip-address-debian/
+```
 ip add show
+```
  - get the name of the network interface (in this case it's ens18)
+```
 nano /etc/network/interfaces
+```
 
 Replace the line 'allow-htplug ens18' with 'auto ens18' and change dhcp parameter to static.  Below is my sample file, change interface name and ip details as per your environment.
-
+```
 auto ens18
 iface ens18 inet static
         address 192.168.1.63/24
@@ -62,34 +74,42 @@ iface ens18 inet static
         broadcast 192.168.1.255
         gateway 192.168.1.1
         dns-nameservers 8.8.8.8
+```
 
 # Setup Docker on new Debian Server (vmdocker):
 - NOTE: SSH into new debian server so that commands can be copy pasted:
 - src: https://docs.docker.com/engine/install/debian/
-	## Add Docker's official GPG key:
-	apt-get update
-	apt-get install ca-certificates curl
-	install -m 0755 -d /etc/apt/keyrings
-	curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-	chmod a+r /etc/apt/keyrings/docker.asc
-	
+## Add Docker's official GPG key:
+```
+apt-get update
+apt-get install ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+
 echo \ 
 "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
 
-# Install Docker packages:  
+# Install Docker and related packages:
+```
 apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Verify installation was successful:
+```
+- Verify installation was successful:
+```
 docker run hello-world
-
---remove hello-world container after test:
+```
+-remove hello-world container after test:
+```
 docker rm <container_id>
-
+```
 -view version and other info: 
+```
 docker info
---results:
+```
+--results example :
 Client: Docker Engine - Community
  Version:    27.3.1
  Context:    default
@@ -103,61 +123,85 @@ Client: Docker Engine - Community
     Path:     /usr/libexec/docker/cli-plugins/docker-compose
 
 # Mount the NAS server directory and localmedia directory for library files:
-	https://support.plex.tv/articles/201122318-mounting-network-resources/
-	-install cifs-utils:
-		apt install cifs-utils
-	-install nfs-common:
-		apt install nfs-common
-	-make mount directories:
-		mkdir /mnt/naspool
-		mkdir /mnt/sdb
-	--NOTE: CHOOSE EITHER CIFS OR NFS:
-	-mount NAS directory as CIFS (SMB):
-		mount -t cifs //192.168.1.103/naspool /mnt/naspool -o rw,user=krimmhouse
-	-mount NAS directory as NFS:
-		mount -t nfs 192.168.1.103:/naspool/share /mnt/naspool
-	-create partition on sdb in docker server:
-		fdisk -l (list partitions)
-		fdisk /dev/sdb (start fdisk on target disk)
-		n (for new partition)
-		-accept all defaults by just hitting enterprise
-		w - write the new partition if everything looks correct
-		lsblk - to show all disks and partitions (should now see sdb1 partition)
-		- create an ext4 file-system (WARNING - THIS WILL ERASE ALL CONTENT ON THE DISK):
-		mkfs.ext4 /dev/sdb1
-		- finally mount the new ext4 disk partition:
-		mount /dev/sdb1 /mnt/sdb	
+https://support.plex.tv/articles/201122318-mounting-network-resources/
+-install cifs-utils:
+```
+apt install cifs-utils
+```
+-install nfs-common:
+```
+apt install nfs-common
+```
+-make mount directories:
+```
+mkdir /mnt/naspool
+mkdir /mnt/sdb
+```
+--NOTE: CHOOSE EITHER CIFS OR NFS:
+-mount NAS directory as CIFS (SMB):
+```
+mount -t cifs //192.168.1.103/naspool /mnt/naspool -o rw,user=<enter-custom-user-here>
+```
+-mount NAS directory as NFS:
+```
+mount -t nfs 192.168.1.103:/naspool/share /mnt/naspool
+```
+-create partition on sdb in docker server:
+```
+fdisk -l (list partitions)
+fdisk /dev/sdb (start fdisk on target disk)
+n (for new partition)
+-accept all defaults by just hitting enterprise
+w - write the new partition if everything looks correct
+lsblk - to show all disks and partitions (should now see sdb1 partition)
+- create an ext4 file-system (WARNING - THIS WILL ERASE ALL CONTENT ON THE DISK):
+mkfs.ext4 /dev/sdb1
+- finally mount the new ext4 disk partition:
+mount /dev/sdb1 /mnt/sdb	
+```
 
 # Edit fstab to auto-mount at boot:
-	--copy fstab file to backup directory (after making a backups directory, if it doesn't exist, update date in backup as needed)
-		mkdir /backups
-		cp  /etc/fstab   /backups/fstab_bak_20241204
-	--list uuid for each drive:
-		ls -al /dev/disk/by-uuid/
-	--edit fstab file:
-		nano /etc/fstab
-	--add the lines:
-		# local drive sdb1
-		UUID=cbd4143f-b99b-4a77-93c8-714ea3d25325       /mnt/sdb        ext4    defaults        0       0
-		# naspool (network)
-		192.168.1.103:/naspool/share /mnt/naspool nfs defaults 0 0	
-		CTRL+X, y to save/write new file
-	--test fstab - check the last line for errors):
-		findmnt --verify
-		NOTE: Ignored udf,iso9660
-	--if everything looks okay, reload the mount fstab:
-		systemctl daemon-reload
+--copy fstab file to backup directory (after making a backups directory, if it doesn't exist, update date in backup as needed)
+```
+mkdir /backups
+cp  /etc/fstab   /backups/fstab_bak_20241204
+```
+--list uuid for each drive:
+```
+ls -al /dev/disk/by-uuid/
+```
+--edit fstab file:
+```
+nano /etc/fstab
+```
+--add the lines:
+```
+# local drive sdb1
+UUID=cbd4143f-b99b-4a77-93c8-714ea3d25325       /mnt/sdb        ext4    defaults        0       0
+# naspool (network)
+192.168.1.103:/naspool/share /mnt/naspool nfs defaults 0 0	
+```
+CTRL+X, y to save/write new file
+--test fstab - check the last line for errors):
+```
+findmnt --verify
+```
+NOTE: Ignored udf,iso9660
+--if everything looks okay, reload the mount fstab:
+```
+systemctl daemon-reload
+```
 
 # Setup Docker directory and Docker Compose (Preferred)
 ```
-	mkdir /opt/benolilab-docker
-	mkdir /opt/benolilab-docker/secrets
+mkdir /opt/benolilab-docker
+mkdir /opt/benolilab-docker/secrets
 ```
 - upload the secrets from secure location (each file is specified in the "secrets" top level section of the docker-compose)
 - environment variables for .env file:
 - NOTE: Environment variables are exposed in the logs, so it is recommended to use docker secrets for passwords and other variables you do not want exposed in plain text in the logs
 ```	
-	NAS_IP_ADDRESS=<nas_ip_or_host_name>
+NAS_IP_ADDRESS=<nas_ip_or_host_name>
 ```
 - upload the .env (environment variables) file to /opt/benolilab-docker
 - After updating a secret or env-variable, you will need to restart the service (see below) to get the new value
@@ -166,36 +210,36 @@ Client: Docker Engine - Community
 - NOTE: The -d option in the docker compose up command stands for "detached mode." When you use this option, Docker Compose runs the containers in the background and returns control to your terminal. This allows you to continue using your terminal for other tasks while the containers run.
 - Add the --build flag after "up" like so in order to rebuild a container with new secrets or ext. files: docker compose up --build -d
 ```
-	cd /opt/benolilab-docker
-	docker ps -a
-	docker compose up -d
-	# Or for a specific container (e.g. after adding to docker compose, without updating all containers)
-	docker compose up -d <container_name>
-	# Or to rebuild: 
-	docker compose up --build -d <container_name>
-	# Or to just restart:
-	docker compose restart <container_name>
+cd /opt/benolilab-docker
+docker ps -a
+docker compose up -d
+# Or for a specific container (e.g. after adding to docker compose, without updating all containers)
+docker compose up -d <container_name>
+# Or to rebuild: 
+docker compose up --build -d <container_name>
+# Or to just restart:
+docker compose restart <container_name>
 ```
 
 # To restart a service (by service name, not container name) - e.g. needed after updating a secret value
 - List docker compose services and ports etc.:
 ```
-	docker compose ps 
+docker compose ps 
 ```
 - Restart the service (to get new secret etc.)
 ```
-	docker compose restart <service_name>
+docker compose restart <service_name>
 ```
 
 # Custom filter process status of docker or docker compose:
 ```
-	docker ps --format "table {{.Image}}\t{{.Names}}\t{{.Status}}"
-	docker compose ps --format "table {{.Image}}\t{{.Name}}\t{{.Status}}\t{{.Service}}"
+docker ps --format "table {{.Image}}\t{{.Names}}\t{{.Status}}"
+docker compose ps --format "table {{.Image}}\t{{.Name}}\t{{.Status}}\t{{.Service}}"
 ```
 
 # Monitor Memory usage and process IDs of Containers (--no-stream option takes snapshot - leave this off to view real-time):
 ```
-	docker stats --no-stream
+docker stats --no-stream
 ```
 
 # Trouble-shooting memory issues - out of memory (OOM)
@@ -203,44 +247,46 @@ Client: Docker Engine - Community
 - backup and modify sysctl.conf
 - it seemed there wasn't enough memory for zfs to perform maintenance and it was killing the docker vm, so adjusted memory settings on VM to fix this
 ```
-	mkdir /backups
-		<!--NOTE: THIS DID NOT WORK WELL AND STOPPED CONNECTIONS TO PROXMOX
-		cp /etc/sysctl.conf /backups/sysctl.conf_bak_20241211
-		nano /etc/sysctl.conf
-		- add line to sysctl and save:
-		vm.overcommit_memory=2
-		- apply changes:
-		sysctl -p 
+mkdir /backups
+	# !--NOTE: THIS DID NOT WORK WELL AND STOPPED CONNECTIONS TO PROXMOX
+	cp /etc/sysctl.conf /backups/sysctl.conf_bak_20241211
+	nano /etc/sysctl.conf
+	# add line to sysctl and save:
+	vm.overcommit_memory=2
+	# apply changes:
+	sysctl -p 
 
-		reverted changes
-		-->
-	cp /etc/modprobe.d/zfs.conf /backups/zfs.conf_bak_20241211
-	nano /etc/modprobe.d/zfs.conf
+	reverted changes
+	-->
+cp /etc/modprobe.d/zfs.conf /backups/zfs.conf_bak_20241211
+nano /etc/modprobe.d/zfs.conf
 ```
 --change arc max from default of 3 GB to 8 GB: 
 	--e.g. change: options zfs zfs_arc_max=3357540352 
 	--to: options zfs zfs_arc_max=8589934592
 --save file and apply changes:
+```
 update-initramfs -u
 reboot
+```
 
 # View/Configure routing on docker host to main home network:
 
 - Identify the Docker Bridge Network: First, find the Docker bridge network's gateway IP address. You can do this by inspecting the Docker network:
 ```
-    docker network inspect server_net
+docker network inspect server_net
 ```
 - Look for the Gateway field in the output.
 - Add a Route on the Host Machine: Use the ip route add command to add a route on the host machine. This command will forward traffic from the Docker network to the target network (e.g., 192.168.x.x):
 ```
-    ip route add 192.168.0.0/16 via <docker_gateway_ip>
-	# Replace <docker_gateway_ip> with the gateway IP address you found in the previous step.
-	# To remove, just change add to del:
-	ip route del 192.168.0.0/16 via <docker_gateway_ip>
+ip route add 192.168.0.0/16 via <docker_gateway_ip>
+# Replace <docker_gateway_ip> with the gateway IP address you found in the previous step.
+# To remove, just change add to del:
+ip route del 192.168.0.0/16 via <docker_gateway_ip>
 ```
 - Verify the Route: Check that the route has been added correctly by running:
 ```
-    ip route
+ip route
 ```
 - You should see a route entry for the 192.168.0.0/16 network via the Docker gateway IP.
 - Configure Firewall Rules (if necessary): Ensure that your firewall rules allow traffic between the Docker network and the target network. You might need to adjust iptables rules or your firewall configuration.
@@ -253,15 +299,15 @@ ssh user@192.168.x.x
 - To SSH into a Docker container, you typically use docker exec rather than traditional SSH. Here's how you can do it:
 - Find the Container ID or Name: List all running containers to find the container ID or name.
 ```
-	docker ps
+docker ps
 ```
 - Execute a Shell Inside the Container: Use the docker exec command to start an interactive shell session inside the container. For example, to start a bash shell:
 ```
-	docker exec -it <container_id_or_name> /bin/bash
+docker exec -it <container_id_or_name> /bin/bash
 ```
 - If the container uses a different shell (e.g., sh), adjust the command accordingly:
 ```
-	docker exec -it <container_id_or_name> /bin/sh
+docker exec -it <container_id_or_name> /bin/sh
 ```
 - Access the Container: You will now be inside the container and can run commands as needed.
 
@@ -273,10 +319,14 @@ e.g. Volumes are here: /var/lib/docker/volumes
 _also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-homelab/blob/main/servers/benolinas/benolinas.md)_
 
 ## Add syncthinguser Group:
-	groupadd -g 1001 syncthinguser
+```
+groupadd -g 1001 syncthinguser
+```
 
 ## Add syncthinguser User (for managing syncthing service access to share without root access)
-	useradd -u 1001 -g 1001 -m -s /bin/bash syncthinguser
+```
+useradd -u 1001 -g 1001 -m -s /bin/bash syncthinguser
+```
 
 ## Create backup directories for docker containers (-p option will ensure parent directories are also created):
 ```
