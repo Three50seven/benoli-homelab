@@ -151,6 +151,7 @@ Create a "secrets" directory in the /opt/scripts/naspool_zfs_backup and upload t
 NOTE: This is used in the bash scripts so that secrets are not kept in source control.
 
 Schedule with Cron:
+NOTE: This has since been setup with a docker container running supercron
 ```
 # List cron jobs:
 crontab -l
