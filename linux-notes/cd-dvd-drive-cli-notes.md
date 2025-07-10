@@ -214,6 +214,26 @@ Replace /path/to/source_data/ with the directory containing the files you want t
 
 You might also add -V "DISC_LABEL" to set a volume label.
 
+*Note: It was discovered in tests, that genisoimage doesn't honor the sort_order.txt as expected, to do so, use xorriso:*
+Generate the ISO using xorriso:
+
+```
+xorriso -outdev /opt/disc-burn/ordered.iso -map /opt/disc-burn/isotest / -compliance no_force_dot_emulation -file_order /opt/disc-burn/sortisotest.txt -volid "TEST_ISO"
+
+# if not installed, run:
+apt update
+apt install xorriso
+```
+-outdev /tmp/ordered.iso: Specifies the output ISO file.
+
+-map /tmp/mysrc /: Maps the content of /tmp/mysrc to the root of the ISO.
+
+-compliance no_force_dot_emulation: Can sometimes help with how . and .. are handled, but often not strictly necessary.
+
+-file_order /path/to/your/sort_order.txt: This is the key. It tells xorriso to use this file for explicit ordering.
+
+-volid "TEST_ISO": used to specify a volume or disc name
+
 *Recommendation:* After creating the ISO, always check its size using ls -lh /path/to/your.iso and compare it to the capacity of your blank disc (e.g., ~700M for CD, ~4.7G for single-layer DVD, ~8.5G for dual-layer DVD).
 
 Burn the Disc:
