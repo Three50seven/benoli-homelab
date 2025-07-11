@@ -214,26 +214,6 @@ Replace /path/to/source_data/ with the directory containing the files you want t
 
 You might also add -V "DISC_LABEL" to set a volume label.
 
-*Note: It was discovered in tests, that genisoimage doesn't honor the sort_order.txt as expected, to do so, use xorriso:*
-Generate the ISO using xorriso:
-
-```
-xorriso -outdev /opt/disc-burn/ordered.iso -map /opt/disc-burn/isotest / -compliance no_force_dot_emulation -file_order /opt/disc-burn/sortisotest.txt -volid "TEST_ISO"
-
-# if not installed, run:
-apt update
-apt install xorriso
-```
--outdev /tmp/ordered.iso: Specifies the output ISO file.
-
--map /tmp/mysrc /: Maps the content of /tmp/mysrc to the root of the ISO.
-
--compliance no_force_dot_emulation: Can sometimes help with how . and .. are handled, but often not strictly necessary.
-
--file_order /path/to/your/sort_order.txt: This is the key. It tells xorriso to use this file for explicit ordering.
-
--volid "TEST_ISO": used to specify a volume or disc name
-
 *Recommendation:* After creating the ISO, always check its size using ls -lh /path/to/your.iso and compare it to the capacity of your blank disc (e.g., ~700M for CD, ~4.7G for single-layer DVD, ~8.5G for dual-layer DVD).
 
 Burn the Disc:
@@ -265,7 +245,213 @@ Considerations and Best Practices:
 
 Proxmox Host Stability: While it's technically possible, generally, it's best practice to keep your Proxmox host as lean and dedicated to virtualization as possible. Installing extra software like burning tools adds more packages, dependencies, and potential points of failure or resource contention. However, for a one-off or infrequent task, it's perfectly acceptable.
 
-## Here's a step-by-step guide to read and copy data files (like documents, images, software installers) and MP3s from a CD/DVD on your Proxmox host's command line:
+## Create an Audio CD
+For Audio CDs:
+
+The files must be in a specific format: WAV files, 44.1 kHz sample rate, 16-bit depth, stereo. If your WAV files don't meet these specifications, you'll need to convert them first (tools like sox or ffmpeg can do this). wodim (or cdrskin / xorrecord) will often give an "Inappropriate audio coding" error if the WAVs are not correct.
+
+_You do not create an ISO image first. You burn the WAV files directly._
+
+The burning tool handles the CD-DA specific formatting.
+
+The order of the files in the command line (or a list file) dictates the track order on the CD.
+
+You'll typically use wodim (or cdrskin / xorrecord if you prefer the xorriso suite).
+
+Here's the general command using wodim:
+
+1. Find your CD/DVD burner device:
+
+First, you need to identify the device name of your optical drive.
+
+```
+wodim --devices
+```
+This will output something like:
+```
+wodim: Overview of accessible drives (1 found) :
+-------------------------------------------------------------------------
+ 0  dev='/dev/sr0'   rwrw-- : 'VENDOR' 'MODEL'
+-------------------------------------------------------------------------
+```
+Note the dev= path (e.g., /dev/sr0, or /dev/cdrom, or ATA:1,0,0 for older systems). Use the most modern /dev/srX or /dev/cdrom if available.
+
+2. Burn the WAV files to an Audio CD:
+
+Replace /dev/sr0 with your actual device and /path/to/your/wav_files/*.wav with the actual path to your WAV files.
+
+```
+wodim dev=/dev/sr0 -v -dao -audio -pad /path/to/your/wav_files/*.wav
+```
+Here's a break down of the options:
+
+`wodim`: The command-line utility for burning CDs/DVDs.
+
+`dev=/dev/sr0`: Specifies your CD/DVD burner device. Crucial: Replace /dev/sr0 with the actual device path you found from wodim --devices.
+
+`-v`: Verbose output, shows progress.
+
+`-dao`: Disc At Once mode. This is generally preferred for audio CDs as it writes the entire disc in one continuous session without leaving gaps between tracks, which helps with playback compatibility.
+
+`-audio`: Tells wodim that the following files are audio tracks (WAV format, 44.1kHz, 16-bit, stereo).
+
+`-pad`: Pads the audio data to ensure proper data length for each track, essential for CD-DA.
+
+`/path/to/your/wav_files/*.wav`: This is where you specify your WAV files.
+
+If they are all in one directory and you want to burn them alphabetically/numerically, *.wav (or 01_song.wav 02_song.wav ...) works.
+
+Crucially for order: The order you list the files on the command line is the order they will be burned to the CD. If you want a specific order that isn't alphabetical, you must list them explicitly:
+
+```
+wodim dev=/dev/sr0 -v -dao -audio -pad "/path/to/wavs/03 Baa Baa Black Sheep.wav" "/path/to/wavs/01 Twinkle Twinkle.wav" "/path/to/wavs/02 Old MacDonald.wav"
+```
+(Note the quotes for filenames with spaces).
+
+Important Considerations:
+
+- WAV File Format: As mentioned, ensure your WAV files are:
+    - 44.1 kHz Sample Rate
+    - 16-bit Sample Depth
+    - Stereo
+    - Uncompressed PCM format
+
+    If not, you'll get errors. sox is a great tool for conversion:
+    ```
+    #(converts to stereo, 44.1kHz, 16-bit)
+    sox input.wav -c 2 -r 44100 -b 16 output.wav 
+    ```
+
+- Disc Space: Audio CDs have a fixed capacity, typically around 74-80 minutes of audio. Ensure your total WAV duration doesn't exceed this. wodim will warn you if it's too large.
+
+- Blank CD-R: Make sure you use a blank CD-R (not CD-RW if you want maximum compatibility with older players, though CD-RWs will work too).
+
+- Unmount Drive: Make sure the CD burner device is not mounted before you start the burn.
+
+- Burning Speed: You can add speed=X (e.g., speed=8) if you want to explicitly set the burn speed. Slower speeds sometimes lead to more reliable burns.
+
+- This command specifically creates a standard Audio CD that should play in any regular CD player.
+
+Install SoX on Proxmox:
+
+```
+sudo apt update
+sudo apt install sox libsox-fmt-all # libsox-fmt-all gets you support for MP3, FLAC, etc.
+```
+Convert all MP3 files in a directory to WAV files, specifically for burning an Audio CD. This means ensuring the WAVs are 44.1 kHz, 16-bit, stereo, uncompressed PCM.
+
+_It's highly recommended to keep your original MP3s in one directory and convert them into a separate directory. This prevents clutter and accidentally overwriting original files._
+
+Paste the following command (after changing directory variables) into Proxmox shell:
+
+_Make sure to create the `WAV_DIR` directory for wav files after conversion, if it doesn't already exist._
+```
+# 1. Define your input and output directories
+MP3_DIR="/opt/disc-burn/benolijamz"    # Replace with the actual path to your MP3 folder
+WAV_DIR="/opt/disc-burn/benolijamzwav" # Replace with the desired path for WAV output
+
+# 2. Create the output directory if it doesn't exist
+mkdir -p "$WAV_DIR"
+
+# 3. Navigate to the MP3 directory
+cd "$MP3_DIR" || { echo "Error: MP3 directory not found or accessible."; exit 1; }
+
+# 4. Loop through each MP3 file and convert it
+for mp3_file in *.mp3; do
+    # Skip if no mp3 files are found (e.g., if the glob matches literal "*.mp3")
+    if [ ! -f "$mp3_file" ]; then
+        echo "No MP3 files found in '$MP3_DIR'."
+        break
+    fi
+
+    # Construct the output WAV filename
+    wav_file="${WAV_DIR}/${mp3_file%.mp3}.wav"
+
+    echo "Converting '$mp3_file' to '$wav_file'..."
+
+    # SoX command for CD-Audio WAV format:
+    # -c 2: Force 2 channels (stereo)
+    # -r 44100: Force 44.1 kHz sample rate
+    # -b 16: Force 16-bit sample depth (signed integer PCM)
+    sox "$mp3_file" -c 2 -r 44100 -b 16 "$wav_file" norm -0.5
+
+    # Check if the conversion was successful
+    if [ $? -eq 0 ]; then
+        echo "Successfully converted '$mp3_file'."
+    else
+        echo "ERROR converting '$mp3_file'. Check SoX output above."
+    fi
+done
+
+echo "Conversion process complete."
+```
+How to use the script:
+
+Copy and paste the entire block of code into your Proxmox shell.
+
+EDIT THE MP3_DIR and WAV_DIR variables at the beginning of the script to your actual paths.
+
+Press Enter to run it.
+
+Explanation of the sox command within the loop:
+
+`sox "$mp3_file"`: The input MP3 file. Quotes are important for filenames with spaces.
+
+`-c 2`: Sets the number of audio channels to 2 (stereo). This is required for Audio CDs.
+
+`-r 44100`: Sets the sample rate to 44,100 Hz. This is the standard for Audio CDs.
+
+`-b 16`: Sets the bit depth to 16 bits. This is the standard for Audio CDs.
+
+`"$wav_file"`: The output WAV file name. Again, quotes are important.
+
+The `norm` effect in SoX automatically adjusts the volume so that the loudest peak in the audio reaches a specified decibel level (relative to full scale). Using a value slightly below 0 dB (like -0.1 dB or -0.5 dB) provides a small "headroom" to prevent clipping during conversion.
+
+`norm -0.5`: This tells SoX to normalize the audio so that its peak amplitude reaches -0.5 dB (decibels) relative to the maximum possible level. This leaves a tiny bit of space (headroom) and usually prevents clipping warnings. You can try norm -0.1 or norm -1.0 if you want more or less headroom.
+
+This will give you a new folder filled with WAV files, all correctly formatted for burning onto a standard Audio CD.
+
+If needed, erase the wav directory to start over (example, adjust the `norm` command to eradicate clipping warnings from SoX:
+```
+# First list contents to be deleted:
+ls -l /opt/disc-burn/benolijamzwav/
+
+# Delete contents (WARNING - this actually removes everything without warning):
+rm -rf /opt/disc-burn/benolijamzwav/*
+```
+
+Here's the command to check your wav folder's contents to determine if they'll fit on a CD:
+
+```
+du -sh /opt/disc-burn/benolijamzwav
+```
+Here's a break down of the options:
+
+`du`: This is the core "disk usage" command.
+
+`-s`: This stands for "summarize." It tells du to display only a total for the specified directory, rather than listing the size of every subdirectory and file within it individually.
+
+`-h`: This stands for "human-readable." It displays the sizes in a format that's easy for humans to read (e.g., K for kilobytes, M for megabytes, G for gigabytes) instead of just bytes or 512-byte blocks.
+
+`/opt/disc-burn/benolijamzwav`: This is the full path to the directory you want to check the size of.
+
+Example Output:
+```
+450M    /opt/disc-burn/benolijamzwav
+```
+This output would tell you that the benolijamzwav directory and all its contents combined are taking up 450 Megabytes of space.
+
+CD Capacity for Reference:
+
+A standard CD-R typically holds 700 MB (megabytes) of data.
+
+Some older or less common CD-Rs might hold 650 MB.
+
+An Audio CD (CD-DA) has a maximum duration, typically 74 to 80 minutes. The amount of data for 80 minutes of CD-quality audio (44.1 kHz, 16-bit, stereo) is roughly 700 MB.
+
+So, if your `du -sh` command shows a size like `450M`, it means the data should comfortably fit on a standard 700MB CD. If it's, for example, `800M` or` 1.2G`, it won't fit on a single CD, and you'd need to either split it across multiple CDs or use a different media type (like a DVD).
+
+## Step-by-step guide to read and copy data files (like documents, images, software installers) and MP3s from a CD/DVD on your Proxmox host's command line:
 
 Part 1: Prerequisites (If you haven't already)
 Ensure the DVD drive is detected by the host:
@@ -363,6 +549,16 @@ eject /dev/sr0
 ```
 Part 3: Ripping Audio CDs (MP3s)
 Ripping audio CDs requires specialized software as they are not standard filesystems but rather audio tracks.
+
+Use cd-info to view audio disc info:
+```
+apt update
+# Install cd-info tools if not already installed:
+apt install libcdio-utils
+
+# View audio disc info:
+cd-info --no-device-info /dev/sr0
+```
 
 Install audio ripping tools:
 The abcde (A Better CD Encoder) tool is excellent for command-line ripping and can automatically convert to MP3. You'll also need lame for MP3 encoding and cdparanoia for audio extraction.
@@ -465,6 +661,7 @@ For folders: The same applies. If you have subfolders, prefix them:
 Benefit: This method is simple, requires no special genisoimage options, and is very reliable.
 
 2. Using a sort File with genisoimage (More Advanced)
+*NOTE: specifying a sort file for genisoimage does not work if the files are already appended with a number.*
 genisoimage has a powerful -sort option that allows you to provide a text file specifying the exact order of files and directories within the ISO image. This gives you granular control.
 
 How it works:
@@ -581,13 +778,53 @@ wodim dev=/dev/sr0 -v -audio /path/to/wavs/01_Intro.wav /path/to/wavs/02_Song.wa
 ```
 Best Practice:
 
-Convert your MP3s to WAVs (using ffmpeg).
+Convert your MP3s to WAVs (using ffmpeg or sox).
 
 Rename the WAV files with numerical prefixes (e.g., 01_TrackName.wav, 02_AnotherTrack.wav).
 
 Then, use a wildcard or list them in order: wodim dev=/dev/sr0 -v -audio *.wav (if in the correct directory and named numerically).
 
 Choose the method that best suits the type of disc you're burning and the level of control you need. For data discs with MP3s, simply renaming files with 01_, 02_, etc., is usually the easiest and most effective way to ensure a specific playback order.
+
+See [burn_audio_cd.sh](https://github.com/Three50seven/benoli-homelab/blob/main/servers/benolinas/scripts/burn_audio_cd/burn_audio_cd.sh) script for a more automated approach to burning MP3 files to an Audio disc format.
+
+_Before running script, make sure the following pre-requisites are met:_
+```
+**Before you run this script:**
+
+1.  **Install Required Tools:**
+    ```bash
+    sudo apt update
+    sudo apt install sox libsox-fmt-mp3 python3-mutagen wodim bc # 'bc' is for floating point math
+    ```
+    * `sox`: For audio conversion and concatenation.
+    * `libsox-fmt-mp3`: SoX plugin for MP3 support.
+    * `python3-mutagen`: Provides `mid3v2` for reading MP3 tags.
+    * `wodim`: The CD burning utility.
+    * `bc`: For precise floating-point arithmetic needed for CUE sheet timings.
+
+2.  **Edit Configuration Variables:**
+    * **`MP3_SOURCE_DIR`**: **Crucially, set this to the full path of the directory containing your MP3 files.**
+    * **`OUTPUT_DIR`**: Choose a working directory where the temporary WAVs, the master WAV, and the CUE sheet will be created. `/opt/disc-burn/audio_cd_project` is a good default, but ensure it exists or can be created.
+    * **`CD_BURNER_DEVICE`**: **Find your actual CD/DVD burner device path** by running `sudo wodim --devices` and replacing `/dev/sr0` with the correct path (e.g., `/dev/sr1`, `/dev/cdrom`, etc.).
+
+3.  **Permissions:**
+    * Ensure the user running the script has read access to `MP3_SOURCE_DIR` and write access to `OUTPUT_DIR`.
+    * The `wodim` command requires `sudo` (root privileges) to access the CD burner device.
+
+4.  **MP3 Tagging Quality:**
+    * The quality of the CD-Text (Artist, Title, Album) on your burned CD will depend entirely on the accuracy and completeness of the ID3 tags in your original MP3 files.
+    * If tags are missing or incorrect, the CUE sheet will use "Unknown Artist" or "Untitled Track".
+
+**How to use the script:**
+
+1.  **Save:** Copy the entire code block above and paste it into a file, e.g., `burn_audio_cd.sh`.
+2.  **Make Executable:** `chmod +x burn_audio_cd.sh`
+3.  **Run:** `./burn_audio_cd.sh`
+4.  **Follow Prompts:** The script will pause and ask you to insert a blank CD-R before burning.
+
+This script automates the complex parts, allowing you to burn professional-looking Audio CDs with CD-Text directly from your MP3 collection on your Proxmox host.
+```
 
 ## Checking ISO File Sort Order:
 The best way to check the file order within an ISO image (especially one created with the sort option) is to mount the ISO file as a loopback device on your Proxmox host and then browse its contents.
