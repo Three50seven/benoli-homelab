@@ -11,6 +11,8 @@ CD_BURNER_DEVICE="/dev/sr0"
 MASTER_WAV_FILE="${OUTPUT_DIR}/audio_cd_master.wav"
 CUE_FILE="${OUTPUT_DIR}/audio_cd.cue"
 TEMP_WAV_DIR="${OUTPUT_DIR}/temp_wavs"
+RAW_PCM_FILE="${OUTPUT_DIR}/audio_cd_master.raw"
+SIM_LOG="${OUTPUT_DIR}/cdrdao_simulation.log"
 
 # --- Function to convert total frames to MM:SS:FF format ---
 frames_to_mmssff() {
@@ -25,12 +27,13 @@ frames_to_mmssff() {
 echo "--- Audio CD Creation from MP3s ---"
 
 # --- Tool Check ---
-for cmd in sox mid3v2 wodim; do
+for cmd in sox mid3v2 wodim cdrdao; do
     if ! command -v "$cmd" &> /dev/null; then
         echo "ERROR: Command '$cmd' not found. Please install it."
-        echo "  For sox: sudo apt install sox libsox-fmt-mp3"
-        echo "  For mid3v2: sudo apt install python3-mutagen"
-        echo "  For wodim: sudo apt install wodim"
+        echo "  For sox: apt install sox libsox-fmt-mp3"
+        echo "  For mid3v2: apt install python3-mutagen"
+        echo "  For wodim: apt install wodim"
+        echo " For cdrdao: apt install cdrdao"
         exit 1
     fi
 done
@@ -38,7 +41,7 @@ done
 # --- Directory Prep ---
 echo "Preparing directories..."
 mkdir -p "$TEMP_WAV_DIR" || { echo "ERROR: Cannot create '$TEMP_WAV_DIR'."; exit 1; }
-rm -f "$TEMP_WAV_DIR"/*.wav "$MASTER_WAV_FILE" "$CUE_FILE"
+rm -f "$TEMP_WAV_DIR"/*.wav "$MASTER_WAV_FILE" "$CUE_FILE" "$RAW_PCM_FILE" "$SIM_LOG"
 
 # --- Gather MP3s ---
 readarray -t MP3_FILES < <(find "$MP3_SOURCE_DIR" -maxdepth 1 -type f -name "*.mp3" | sort -V)
@@ -172,14 +175,15 @@ fi
 # 588 x 4 = 2352 bytes (1 CDDA sector)
 
 echo "Converting padded master WAV to raw PCM..."
-RAW_PCM_FILE="${MASTER_WAV_FILE%.wav}.raw"
+echo "NOTE: You can test playback of this raw file using ffplay, for example: ffplay -f s16le -ar 44100 -nodisp -autoexit .\audio_cd_master.raw"
 
-sox "$MASTER_WAV_FILE" -t raw "$RAW_PCM_FILE" || {
+sox "$MASTER_WAV_FILE" -t raw -r 44100 -c 2 -b 16 -e signed-integer "$RAW_PCM_FILE" || {
     echo "ERROR: Failed to export raw PCM."
     exit 1
 }
 
 byte_size=$(stat -c %s "$RAW_PCM_FILE")
+
 if (( byte_size % 2352 != 0 )); then
     echo "RAW PCM file is not a multiple of 2352 bytes! ($byte_size bytes)"
     exit 1
@@ -187,10 +191,20 @@ else
     echo "RAW PCM file is aligned to CDDA sector size ($byte_size bytes)"
 fi
 
+byte_size_master=$(( $(soxi -s "$MASTER_WAV_FILE") * 4 ))
+
+if (( byte_size != byte_size_master )); then
+    echo "RAW PCM file byte size ($byte_size bytes) does not equal the master WAV file audio data size ($byte_size_master bytes)"
+    exit 1
+else
+    echo "RAW PCM file size ($byte_size bytes) matches expected size from master WAV ($byte_size_master bytes), moving on with next steps."
+fi
+
+
 echo "Generating Cue file..."
 
 # --- Generate Cue Sheet ---
-CUE_CONTENT+="FILE \"$(basename "$RAW_PCM_FILE")\" BINARY\n"
+CUE_CONTENT+="FILE \"$RAW_PCM_FILE\" BINARY\n"
 CURRENT_CUMULATIVE_FRAMES=0
 TRACK_NUMBER=0
 
@@ -252,9 +266,25 @@ else
     echo
 fi
 
+# --- More validation to help prevent a bad disc: ---
+
+echo
+echo "--- Simulating burn layout with cdrdao to validate cue file..."
+
+if ! cdrdao simulate --device "$CD_BURNER_DEVICE" "$CUE_FILE" 2>&1 | tee -a "$SIM_LOG"; then
+    echo "Simulation failed. See log:"
+    cat "$SIM_LOG"
+    echo "Aborting burn to prevent a bad disc."
+    exit 1
+else
+    echo "Simulation successful - cue layout is valid."
+fi
+
 # --- Burn CD ---
 echo "--- Ready to Burn ---"
 echo "Insert a blank CD into '$CD_BURNER_DEVICE'."
+echo "Note: if you choose to review logs and output of this script prior to burning, you can manually run the burn using:"
+echo "cdrdao write --device \"$CD_BURNER_DEVICE\" --speed 8 \"$CUE_FILE\""
 read -rp "Press Enter to continue, or Ctrl+C to cancel...."
 
 if mountpoint -q "$CD_BURNER_DEVICE"; then
@@ -263,8 +293,9 @@ if mountpoint -q "$CD_BURNER_DEVICE"; then
 fi
 
 echo "Burning disc..."
-wodim dev="$CD_BURNER_DEVICE" -v -dao -cuefile "$CUE_FILE" || {
-    echo "ERROR: wodim burning failed. Check output above for details."
+# ALTERNATIVELY USE WODIM BURN COMMAND: wodim dev="$CD_BURNER_DEVICE" -v -dao -cuefile "$CUE_FILE"
+cdrdao write --device "$CD_BURNER_DEVICE" --speed 8 --enable-cdtext "$CUE_FILE" || {
+    echo "ERROR: Disc burning failed. Check output above for details."
     echo "Possible issues: incorrect device, no blank disc, permissions, or drive errors."
     exit 1
 }
@@ -276,5 +307,6 @@ rm -rf "$TEMP_WAV_DIR"
 # Uncomment the next line if you also want to delete the master WAV
 # rm -f "$MASTER_WAV_FILE"
 echo "Done."
+echo "Optionally eject the disc with: eject $CD_BURNER_DEVICE"
 
 echo "--- Script Finished ---"
