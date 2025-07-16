@@ -4,7 +4,8 @@
 # ./issue-wildcard-cert.sh
 
 # ========== CONFIG ==========
-KEY_NAME="mylab"
+KEY_NAME="mylab" # Second level domain (SLD) e.g. mylab portion of mylab.home
+CA_TLD="home" # Top level domain (TLD) e.g. home porttion of mylab.home
 ROOT_CA_NAME="mylab-rootCA"
 STATE="StateName"
 CITY="CityName"
@@ -73,16 +74,16 @@ C = US
 ST = ${STATE}
 L = ${CITY}
 O = ${ORG}
-CN = ${KEY_NAME}.local
+CN = ${KEY_NAME}.${CA_TLD}
 
 [ req_ext ]
 subjectAltName = @alt_names
 
 [ alt_names ]
-DNS.1 = *.${KEY_NAME}.local
-DNS.2 = *.svc.${KEY_NAME}.local
-DNS.3 = ${KEY_NAME}.local
-DNS.4 = svc.${KEY_NAME}.local
+DNS.1 = *.${KEY_NAME}.${CA_TLD}
+DNS.2 = *.svc.${KEY_NAME}.${CA_TLD}
+DNS.3 = ${KEY_NAME}.${CA_TLD}
+DNS.4 = svc.${KEY_NAME}.${CA_TLD}
 EOF
 }
 

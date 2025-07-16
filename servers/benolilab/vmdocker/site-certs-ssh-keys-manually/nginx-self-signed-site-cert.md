@@ -1,5 +1,5 @@
 # Note: This is a manual process that has been replaced with NPM, a duckdns domain, and auto-site-cert-renewal
-# Also, see "issue-wildcard-cert.sh" as and exmaple to partially automate the site-cert creation.
+# Also, see "issue-wildcard-cert.sh" as an exmaple to partially automate the site-cert creation.
 # Generate Self-signed SSL Site Cert for HTTPS Use in Nginx Proxy Manager (NPM)
 Pre Setup:
 Make a new site-certs directory:
