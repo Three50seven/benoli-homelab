@@ -6,13 +6,14 @@
 # ========== CONFIG ==========
 KEY_NAME="mylab" # Second level domain (SLD) e.g. mylab portion of mylab.home
 CA_TLD="home" # Top level domain (TLD) e.g. home porttion of mylab.home
+CA_ALT_NAME="svc" # Alternate name used in DNS SANs, e.g. svc.mylab.home and *.svc.mylab.home
 ROOT_CA_NAME="mylab-rootCA"
 STATE="StateName"
 CITY="CityName"
 ORG="OrgName"
 KEY_SIZE=4096
-DAYS_CA=1825
-DAYS_CERT=731
+DAYS_CA=1825 # Default to ~5 years
+DAYS_CERT=731 # Default to ~2yrs + 1 day
 ARCHIVE_DIR="./archive"
 DATESTAMP=$(date +%Y%m%d)
 
@@ -81,9 +82,9 @@ subjectAltName = @alt_names
 
 [ alt_names ]
 DNS.1 = *.${KEY_NAME}.${CA_TLD}
-DNS.2 = *.svc.${KEY_NAME}.${CA_TLD}
+DNS.2 = *.${CA_ALT_NAME}.${KEY_NAME}.${CA_TLD}
 DNS.3 = ${KEY_NAME}.${CA_TLD}
-DNS.4 = svc.${KEY_NAME}.${CA_TLD}
+DNS.4 = ${CA_ALT_NAME}.${KEY_NAME}.${CA_TLD}
 EOF
 }
 
