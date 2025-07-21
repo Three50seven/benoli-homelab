@@ -2,7 +2,7 @@
 set -e
 trap '' PIPE
 
-# Inside your cron file or script - setting this to run daily so that it stays within the MAX_AGE - if updating one, make sure to update the heartbeat schecule accordingly
+# Inside your cron file or script - setting this to run daily so that it stays within the MAX_AGE - if updating one, make sure to update the heartbeat schedule accordingly
 # 0 0 * * * /app/scripts/healthcheck-heartbeat.sh
 
 # check for heartbeat log file
