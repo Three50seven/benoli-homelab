@@ -5,7 +5,7 @@
 
 # ========== CONFIG ==========
 KEY_NAME="mylab" # Second level domain (SLD) e.g. mylab portion of mylab.home
-CA_TLD="home" # Top level domain (TLD) e.g. home porttion of mylab.home
+CA_TLD="home" # Top level domain (TLD) e.g. home portion of mylab.home
 CA_ALT_NAME="svc" # Alternate name used in DNS SANs, e.g. svc.mylab.home and *.svc.mylab.home
 ROOT_CA_NAME="mylab-rootCA"
 STATE="StateName"
