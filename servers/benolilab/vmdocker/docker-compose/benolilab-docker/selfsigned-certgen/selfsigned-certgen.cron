@@ -1,0 +1,8 @@
+# Run at the specified time - supercronic will execute the schedule - see README at https://github.com/aptible/supercronic
+# supercronic (installed in container) supports runs per second (not recommended) or minute- e.g. * * * * * runs every minute, or */5 * * * * runs every 5 minutes, */5 * * * * * * runs every 5 seconds (again, not recommended unless you're debugging)
+# The subsequent * characters represent the minutes, hours, day of the month, month, and day of the week, indicating that the command should run regardless of these values.
+# Note: job labels help distinguish each job with a label to help identify/verify it
+# job: selfsigned-certgen-job
+0 3 1,15 * * /app/scripts/selfsigned-certgen-trigger.sh
+# job: healthcheck-heartbeat
+0 0 * * * /app/scripts/healthcheck-heartbeat.sh

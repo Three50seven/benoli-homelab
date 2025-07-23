@@ -1,0 +1,1 @@
+Placeholder - this directory will be mounted to the selfsigned-certgen container for storing archived certs

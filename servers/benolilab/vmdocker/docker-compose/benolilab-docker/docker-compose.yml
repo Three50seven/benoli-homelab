@@ -2,6 +2,8 @@ name: benolilab-docker
 secrets:
     plex_claim:
         file: ./secrets/.plex_claim    
+    certgen_notifications_discord_hook_url:
+        file: ./secrets/.certgen_notifications_discord_hook_url
 x-logging: &default-logging
   driver: json-file
   options:
@@ -91,6 +93,7 @@ services:
           - "nginx_proxy_config:/config"
           - "nginx_proxy_letsencrypt:/etc/letsencrypt"
           - "nginx_proxy_data:/data"
+          - ./selfsigned-certgen/certs:/mnt/certs:ro
         labels:
             description: "Nginx, pronounced 'engine-x,' is a versatile open-source software that acts as a web server, reverse proxy, load balancer, and more."
             com.centurylinklabs.watchtower.enable: "true"
@@ -130,6 +133,33 @@ services:
           interval: 1m
           timeout: 10s
           retries: 3
+    selfsigned-certgen:
+        build: ./selfsigned-certgen
+        container_name: selfsigned-certgen
+        volumes:
+            - ./selfsigned-certgen/certs:/certs
+            - ./selfsigned-certgen/archive:/archive    
+        logging: *default-logging
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.25
+        env_file:
+            - ./selfsigned-certgen/selfsigned-certgen.env
+        environment:
+            DRY_RUN: false
+            DISABLE_CRON: false
+        secrets:
+            - certgen_notifications_discord_hook_url
+        restart: unless-stopped
+        labels:
+            description: "Custom container for running the selfsigned-certgen script to generate a SSL certificate authority and self-sign a homelab cert to be used by NPM and other services that may need it."
+            # com.docker.backup.restart-policy: {{match-to-docker-compose-restart-policy-value}} # Add this label to containers to store the original docker compose restart policy for applying back to the container after it is restarted after backups
+        healthcheck:
+          test: ["CMD-SHELL", "/app/scripts/healthcheck.sh"]
+          interval: 60s
+          timeout: 5s
+          retries: 3
+          start_period: 10s
 volumes:
     nginx_proxy_config:
         name: nginx_proxy_config
