@@ -317,3 +317,10 @@ zfs send -R -i naspool@lastbackup naspool@newbackup | zfs receive -F backup1/nas
 ```
 Label the Physical Drives:
 Physically marking disks as backup1 and backup2 helps avoid confusion when rotating.
+
+## Camera File Cleanup:
+See cleanup-camera-uploads [README](https://github.com/Three50seven/benoli-homelab/tree/main/servers/benolinas/scripts/cleanup-camera-uploads).
+Cron tab entry:
+```
+0 3 * * * /opt/scripts/cleanup-camera-uploads/cleanup-camera-uploads.sh --delete
+```
