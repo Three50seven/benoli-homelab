@@ -149,7 +149,17 @@ archive_old_files() {
     mkdir -p "$ARCHIVE_DIR"
     for file in "${CERT_FILES[@]}"; do
         if [[ -f "$file" ]]; then
-            mv "$file" "${ARCHIVE_DIR}/${file}_${DATESTAMP}"
+            # Extract filename and extension
+            filename=$(basename "$file")
+            name="${filename%.*}"
+            ext="${filename##*.}"
+            
+            # Handle files without extensions
+            if [[ "$name" == "$ext" ]]; then
+                mv "$file" "${ARCHIVE_DIR}/${name}_${DATESTAMP}"
+            else
+                mv "$file" "${ARCHIVE_DIR}/${name}_${DATESTAMP}.${ext}"
+            fi
         fi
     done
 }
@@ -158,8 +168,8 @@ archive_old_ca() {
     mkdir -p "$ARCHIVE_DIR"
     if [[ -f "${ROOT_CA_NAME}.crt" && -f "${ROOT_CA_NAME}.key" ]]; then
         echo "Archiving existing CA..."
-        mv "${ROOT_CA_NAME}.crt" "${ARCHIVE_DIR}/${ROOT_CA_NAME}.crt_${DATESTAMP}"
-        mv "${ROOT_CA_NAME}.key" "${ARCHIVE_DIR}/${ROOT_CA_NAME}.key_${DATESTAMP}"
+        mv "${ROOT_CA_NAME}.crt" "${ARCHIVE_DIR}/${ROOT_CA_NAME}_${DATESTAMP}.crt"
+        mv "${ROOT_CA_NAME}.key" "${ARCHIVE_DIR}/${ROOT_CA_NAME}_${DATESTAMP}.key"
     fi
 }
 
@@ -241,8 +251,6 @@ if [ "${DRY_RUN}" = "true" ]; then
     send_discord_notification ":white_check_mark::test_tube: **_Test_ run of selfsigned-certgen Completed Successfully** - This was a test only."
 else
     log_message "[selfsigned-certgen-trigger] DRY_RUN disabled - generating new certificate if needed..."
-    echo "Archiving old cert/key files..."
-    archive_old_files
 
     echo "Checking existing Root CA..."
     if check_ca_validity; then
@@ -258,12 +266,15 @@ else
         send_discord_notification "Valid certificate found. No need to generate a new certificate."
     elif [[ $status -eq 0 ]]; then
         send_discord_notification "Certificate expired. Regenerating..."
+        archive_old_files
         generate_selfsigned_certificate
     elif [[ $status -eq 3 ]]; then
         send_discord_notification "Root CA updated. Regenerating certificate..."
+        archive_old_files
         generate_selfsigned_certificate
     else
         send_discord_notification "Certificate or key missing. Regenerating..."
+        archive_old_files
         generate_selfsigned_certificate
     fi
 
