@@ -28,10 +28,10 @@ services:
           - "/var/run/docker.sock:/var/run/docker.sock"
           - "portainer_data:/data"
         healthcheck:
-              test: ["CMD-SHELL", "wget --no-check-certificate --spider -q https://localhost:9443/api/status || exit 1"]
-              interval: 1m30s
-              timeout: 30s
-              retries: 5
+            test: ["CMD", "wget", "--no-check-certificate", "--spider", "-q", "https://localhost:9443/api/system/status"]
+            interval: 1m30s
+            timeout: 30s
+            retries: 5
         labels:
             description: "Portainer is a web-based Docker management system that provides a convenient graphical user interface (GUI). It lets you take charge of your containers, images, volumes, and other resources, without memorizing long terminal commands."
             com.centurylinklabs.watchtower.enable: "true"
@@ -293,10 +293,7 @@ volumes:
         external: true # defined in benolilab-docker/docker-compose.yml
     plex_server_media:
         name: plex_server_media
-        external: true # defined in benolilab-docker/docker-compose.yml
-    syncthing_config:
-        name: syncthing_config
-        external: true # defined in benolilab-docker/docker-compose.yml
+        external: true # defined in benolilab-docker/docker-compose.yml    
     immich_pgdata:
         external: true # prevent from defining again since volume is defined in immich-docker/docker-compose.yml
     immich_model_cache:

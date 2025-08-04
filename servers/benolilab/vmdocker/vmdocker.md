@@ -315,62 +315,16 @@ docker exec -it <container_id_or_name> /bin/sh
 /var/lib/docker
 e.g. Volumes are here: /var/lib/docker/volumes
 
-# Syncthing Group and User setup
-_also setup on NAS - see [benolinas.md](https://github.com/Three50seven/benoli-homelab/blob/main/servers/benolinas/benolinas.md)_
+# Mobile Device File Sync - Group and User setup:
+FolderSync was chosen for Phone -> NAS file synching.  This will sync camera images/videos (and any other files specified in the settings).
 
-## Add syncthinguser Group:
-```
-groupadd -g 1001 syncthinguser
-```
+## FolderSync User and Directory Setup:
+See the [benolinas setup-sftp-user README](https://github.com/Three50seven/benoli-homelab/tree/main/servers/benolinas/scripts/setup-sftp-user) for FolderSync user setup.  There is a script mentioned there that will generate an SSH key that can be used in the Android app to connect to the NAS server via SMTP.
 
-## Add syncthinguser User (for managing syncthing service access to share without root access)
-```
-useradd -u 1001 -g 1001 -m -s /bin/bash syncthinguser
-```
+## Connect FolderSync files to Immich:
+Add the user directories to Immich as read-only volumes in the docker-compose.  See [README](https://github.com/Three50seven/benoli-homelab/blob/main/servers/benolinas/scripts/setup-sftp-user/README.md#immich-setup), as mentioned above for details.
 
-## Create backup directories for docker containers (-p option will ensure parent directories are also created):
-```
-mkdir -p /mnt/naspool/benolilab-docker/syncthingdata
-```
-## Change owner and grant permissions to read/write for syncthinguser user on backup directory:
-```
-chown syncthinguser:syncthinguser -R /mnt/naspool/benolilab-docker/syncthingdata
-chmod -R 770 /mnt/naspool/benolilab-docker/syncthingdata
-```
-## Update the default folder settings 
-- Go to GUI via web URL - https://[DOCKER_HOST_IP]:8384 > Actions > Settings > Click "Edit Folder Defaults" in "General" tab > Click "Advanced" tab
-- Change folder settings to receive only
-- Check box to "Ignore Permissions"
-
-## When adding a new folder in Syncthing GUI:
-- Create a new folder for each device's backups to keep syncing easier to manage.
-- Make sure default settings are used (as mentioned/set above)
-- Make sure to use the full folder path, i.e. /syncthingdata/new-folder-name
-- Use lowercase kebab formatting e.g. new-folder-name	
-
-## Verify that the UID/GID mapping in the Syncthing container is correct:
-```
-# Run the following on the Docker host (vmdocker):
-id syncthinguser
-# Output should be something like: uid=1001(syncthinguser) gid=1001(syncthinguser) groups=1001(syncthinguser)
-	
-# Run the same on Docker host and you should see a similar output (make sure the UID and GIDs are the same)
-# Verify the owner is syncthinguser for the mnt
-ls -ld /mnt/naspool/benolilab-docker/syncthingdata
-	
-# If it's not, change ownership:
-chown -R 1001:1001 /mnt/naspool/benolilab-docker/syncthingdata
-	
-# Verify the UID/GID is used by the container:
-docker logs syncthing | grep "User UID" && docker logs syncthing | grep "User GID"
-# Expected output: User UID:    1001 && User GID:    1001
-	
-# NOTE: You may need to take it down and rebuild it restart it if changes are made
-docker compose down syncthing
-docker compose up --build -d syncthing
-```
-
-# Immich - photo and video manager and backup service
+# Immich - photo and video manager and viewing service
 - Add immichgroup Group && User (for managing immich service access to share without root access):
 ```
 groupadd immichgroup
@@ -392,6 +346,12 @@ mkdir -p /opt/immich-docker
 cd /opt/immich-docker
 docker ps -a
 docker compose up -d
+```
+
+- Force a pull for a new container image:
+- NOTE: Watchtower should pull the latest release version now that the `com.centurylinklabs.watchtower.enable: "true"` label is applied.  However, if a new docker container image is needed for this, or any other docker container, run the `pull` command:
+```
+docker compose pull immich-server
 ```
 
 # Monitorance - Monitoring and Maintenance apps
