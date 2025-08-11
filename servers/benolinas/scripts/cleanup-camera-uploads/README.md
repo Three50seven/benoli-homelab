@@ -3,14 +3,16 @@ This script gives more control over the cleanup process for .trashed camera file
 
 For example, when you delete an image or video on Android, it gets prefixed/renamed with ".trashed-#######-" or something similar.  The image will then get uploaded again by FolderSync.  There would then be two copies on the NAS storage, e.g. image.jpg and .trashed-123456-image.jpg. To get around this, the `cleanup-camera-uploads.sh` script was created to get rid of the duplicate .trashed files.
 
+Since Android retains trashed images for 30 days (unless they are deleted permanently), the script was updated to only find and delete .trashed files from the server if they are older than 30 days.  This helps prevent FolderSync from uploading the same .trashed files each interval until the .trashed files are deleted from the phone's storage permanently.
+
 Usage examples:
 ```
 # See what would be deleted (default behavior)
-./cleanup-trashed.sh
-./cleanup-trashed.sh --dry-run
+./cleanup-camera-uploads.sh
+./cleanup-camera-uploads.sh --dry-run
 
 # Actually delete the files
-./cleanup-trashed.sh --delete
+./cleanup-camera-uploads.sh --delete
 ```
 
 Features:
@@ -24,14 +26,14 @@ Features:
 
 To set it up:
 ```
-chmod +x cleanup-trashed.sh
+chmod +x cleanup-camera-uploads.sh
 
 # Test it first
-./cleanup-trashed.sh --dry-run
+./cleanup-camera-uploads.sh --dry-run
 
 # When ready, add to cron for automatic cleanup
 crontab -e
-# Add: 0 3 * * * /path/to/cleanup-trashed.sh --delete
+# Add: 0 3 * * * /path/to/cleanup-camera-uploads.sh --delete
 
 # ┌───────────── minute (0 - 59)
 # │ ┌───────────── hour (0 - 23)
