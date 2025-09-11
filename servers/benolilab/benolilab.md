@@ -10,59 +10,36 @@
 	- Model: MZ-77E500
 
 # Physical Machine info:
-Product: MINI TOWER PC
-MODEL: DELL Optiplex 7040
-CPU: 8 x Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz (1 Socket
-RAM: 32GB DDR4 Speed 2133 MHz
+- Product: MINI TOWER PC
+- MODEL: DELL Optiplex 7040
+- CPU: 8 x Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz (1 Socket
+- RAM: 32GB DDR4 Speed 2133 MHz
 
-# Create ZFS Pool with remaining diskspace:
-- See [partition-storage-device-linux.md](https://github.com/Three50seven/benoli-homelab/blob/main/linux-notes/partition-storage-device-linux.md) for notes on using the rest of the partition not used by the root file system of Proxmox
-- Run Command to view free space and disk usage stats in human readable format - note the "Type", you should see ZFS pools that can be imported
-df -Th
+# Download Debian OS ISO:
+Go to Local storage - ISO (or other storage if added as directory from ZFS drives)
 
-- See [partition-storage-device-linux.md](https://github.com/Three50seven/benoli-homelab/blob/main/linux-notes/zfs-file-system-notes.md) FOR MORE ZFS POOL COMMANDS, SPECIFICALLY NOTES ABOUT IMPORTING POOL FROM PREV. SYSTEM IF THIS IS A REINSTALL OF PROXMOX:
-```
-zpool list
-root@benolilab:~# zpool list
-NAME      SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-rpool    63.5G  1.35G  62.2G        -         -     0%     2%  1.00x    ONLINE  -
-zbarrel   464G   106K   464G        -         -     0%     0%  1.00x    ONLINE  -
-zkeg      173G   108K   173G        -         -     0%     0%  1.00x    ONLINE  -
-```
+NOTE: To get the latest, go to https://debian.osuosl.org/debian-cdimage/current/amd64/iso-dvd/ and update the link below when downloading.
 
-# Potentially remove the nag (popop warning) about licensing in Proxmox Web Manager:
-https://dannyda.com/2020/05/17/how-to-remove-you-do-not-have-a-valid-subscription-for-this-server-from-proxmox-virtual-environment-6-1-2-proxmox-ve-6-1-2-pve-6-1-2/
-For Proxmox versions 8+ use the following "one-shot":
-```
-sed -i.backup -z "s/res === null || res === undefined || \!res || res\n\t\t\t.data.status.toLowerCase() \!== 'active'/false/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js && systemctl restart pveproxy.service
-```
-Or follow the manual process in the link above.
+Download: https://debian.osuosl.org/debian-cdimage/12.8.0/amd64/iso-dvd/debian-12.8.0-amd64-DVD-1.iso
 
-# Update the APT (Advance Package Tool) Repositories in Proxmox Host:
-- Guide: https://benheater.com/bare-metal-proxmox-laptop/amp/
-	# Comment out the enterprise repositories - using Command Line:
-```
-sed '/^[^#]/ s/^/# /' -i /etc/apt/sources.list.d/pve-enterprise.list
-sed '/^[^#]/ s/^/# /' -i /etc/apt/sources.list.d/ceph.list
-```
+Note: This was the latest URL from the Debian Host as of 2024.11.30 - check latest for updated version
 
-# Add the community repositories
-```
-echo -e '\n# Proxmox community package repository' >> /etc/apt/sources.list
-echo "deb http://download.proxmox.com/debian/pve $(grep CODENAME /etc/os-release | cut -d '=' -f 2) pve-no-subscription" >> /etc/apt/sources.list
-```
+# Setup debian server VM for docker engine:
+- name: vmdocker
+- OS - Use CD/DVD - debian-12.8 (downloaded earlier)
+- 150GiB HD on zkeg
+- 250GiB HD on zbarrel
+- CPU - 1 Sockets - 8 Cores, x86-64-v2-AES - leave all other defaults
+- Memory: 20480 MB (use most, i.e. 20 GB of the 32GB of RAM from proxmox host so that Docker can use most resources)
+	- checked "top" command in linux and saw that there is ~25570 MiB free, so taking about 80-90% of this for the VM is recommended
+	- set minumum to 8 GB: 8192 MB - Minimum Memory: Typically, setting the minimum memory to around 25-50% of the maximum memory is a good practice. For a VM with 20GB maximum memory, this would be:
+		- 25% of 20GB: ( 20 \times 0.25 = 5 ) GB
+		- 50% of 20GB: ( 20 \times 0.5 = 10 ) GB
+		- Suggested Minimum Memory:
+		- 5GB to 10GB: This range should provide a balance between ensuring the VM can start and run essential services while leaving room for dynamic memory allocation as needed.
+	- make sure ballooning is checked to ensure memory can be dynamically adjusted based on needs of the host and other VMs
+- Network: Leave default
+- Finish and start VM - run through Debian install
+- hostname: vmdocker.network.local <or whatever you want here>
 
-# Then run the following to clean and update:
-```
-apt clean && apt update
-```
-
-# Run upgrade to upgrade all packages to latest:
-- NOTE: You can use "apt --dry-run upgrade" for a dry-run before upgrading
-- Reference: https://www.baeldung.com/linux/list-upgradable-packages
-```
-apt upgrade
-```
-
-# Make sure zpool is listed as storage option for VMs and OSs:
-go to the Proxmox GUI of host machine on local IP, them go to Datacenter > Storage > Add > ZFS > Choose the zpool you wanted to add.
+_see **vmdocker.md** for remaining setup after debian server is installed_
