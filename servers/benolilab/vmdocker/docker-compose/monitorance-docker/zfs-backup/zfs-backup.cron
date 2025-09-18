@@ -5,7 +5,8 @@
 # The zfs-backup-trigger.sh script accepts two variables which are then passed on to the NAS host to be used in the ZFS snapshot and backup script.
 # SNAP_TYPE: can be any of the following: daily|weekly|monthly|yearly
 # RETENTION_PERIOD: If zero (0) - a snapshot will not be taken for that period, for example, you may want to keep 1 or 2 yearly snapshots, and 7 dailys.
+# Set to "live" mode by setting flag on cron job like so: --live (e.g. ...zfs-backup-trigger.sh daily 7 --live)
 # job: zfs-backup-job
-0 4 * * * /app/scripts/zfs-backup-trigger.sh daily 7
+0 4 * * * /app/scripts/zfs-backup-trigger.sh daily 7 --live
 # job: healthcheck-heartbeat
 0 0 * * * /app/scripts/healthcheck-heartbeat.sh
