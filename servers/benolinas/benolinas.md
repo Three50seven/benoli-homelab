@@ -239,6 +239,16 @@ zfs destroy naspool@backup
 zfs list -r -o name,used,available naspool_backup1
 ```
 
+You can alternatively call a custom script - see zfs_snapshot_send_progress.sh within the scripts directory.
+Once SSH'd into the NAS server, change directory to the scripts directory
+```
+cd /opt/scripts/naspool_zfs_backup
+```
+Run the progress script with the estimated start-time for the ZFS send, for example:
+```
+bash zfs_snapshot_send_progress.sh "2025-09-18 10:59:38" naspool_backup1
+```
+
 ## Swapping disks:
 
 When swapping disks, always export the active pool first:
