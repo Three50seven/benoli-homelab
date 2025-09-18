@@ -201,8 +201,20 @@ This sends all datasets, preserving properties and snapshots.
 zfs send -R naspool@daily_backup_YYYYMMDD | zfs receive -Fdu naspool_backup1
 ```
 
-Incremental Backups (After the First Backup)
+## Incremental Backups (After the First Backup)
+
 For incremental backups:
+
+Change directory to the script on the server 
+```
+cd /opt/scripts/naspool_zfs_backup
+```
+
+Run the script manually in "live" mode:
+```
+bash zfs_backup.sh daily 7 --live
+```
+
 1. Take a new snapshot:
 ```
 zfs snapshot -r naspool@backup2
