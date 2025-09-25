@@ -240,13 +240,23 @@ zfs list -r -o name,used,available naspool_backup1
 ```
 
 You can alternatively call a custom script - see zfs_snapshot_send_progress.sh within the scripts directory.
-Once SSH'd into the NAS server, change directory to the scripts directory
+Once SSH'd into the NAS server, change directory to the scripts directory:
 ```
 cd /opt/scripts/naspool_zfs_backup
 ```
+
+Get the estimated send value by running a dry-run of the incremental send like this or just take the difference from the zfs list command: 
+```
+zfs send -n -P -v -i naspool@daily_backup_20250509 naspool@daily_backup_20250918
+
+# Output would be something like this:
+incremental     naspool@daily_backup_20250509   naspool@daily_backup_20250918   29296
+size    29296
+```
+
 Run the progress script with the estimated start-time for the ZFS send, for example:
 ```
-bash zfs_snapshot_send_progress.sh "2025-09-18 10:59:38" naspool_backup1
+bash zfs_snapshot_send_progress.sh "2025-09-18 10:59:38" 1058GB
 ```
 
 ## Swapping disks:
