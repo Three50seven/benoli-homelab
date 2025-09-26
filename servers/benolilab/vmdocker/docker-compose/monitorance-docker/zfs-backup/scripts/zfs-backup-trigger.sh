@@ -9,6 +9,10 @@ SNAP_TYPE="$1"
 # If zero (0) - a snapshot will not be taken for that period
 RETENTION_PERIOD="$2"
 
+# Remove the first two arguments that we've already processed.
+# Now, "$@" contains all remaining arguments (e.g., --live, --verbose, etc.)
+shift 2
+
 SSH_KEY_PATH="${ZFS_BACKUP_SSH_KEY}"
 SSH_USER=$(cat "${ZFS_BACKUP_SSH_USER}")
 SSH_HOST=$(cat "${ZFS_BACKUP_SSH_HOST}")
@@ -46,8 +50,9 @@ if [ "${DRY_RUN}" = "true" ]; then
         && echo "[zfs-backup-trigger] - SSH succeeded" \
         || echo "[zfs-backup-trigger] - SSH failed"
 else
-    echo "[zfs-backup-trigger] DRY_RUN disabled - executing ZFS backup script remotely - SNAP_TYPE=${SNAP_TYPE}, RETENTION_PERIOD=${RETENTION_PERIOD}..."
-    ssh -i "${SSH_KEY_PATH}" "${SSH_USER}@${SSH_HOST}" "${SSH_HOST_SCRIPT_FULL_PATH} ${SNAP_TYPE} ${RETENTION_PERIOD}"
+    echo "[zfs-backup-trigger] DRY_RUN disabled - executing ZFS backup script remotely - SNAP_TYPE=${SNAP_TYPE}, RETENTION_PERIOD=${RETENTION_PERIOD}, OTHER_OPTIONS=\"${@}\"..."
+    # Pass the SNAP_TYPE, RETENTION_PERIOD, and all remaining options ("$@")
+    ssh -i "${SSH_KEY_PATH}" "${SSH_USER}@${SSH_HOST}" "${SSH_HOST_SCRIPT_FULL_PATH} ${SNAP_TYPE} ${RETENTION_PERIOD} \"$@\""
 fi
 
 # Get next scheduled run:

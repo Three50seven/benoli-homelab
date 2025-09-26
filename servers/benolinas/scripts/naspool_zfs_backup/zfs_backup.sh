@@ -110,7 +110,7 @@ IS_TEST="true"  # default
 TEST_MODE_SET=""
 LIVE_MODE_SET=""
 
-# Parse the opations:
+# Parse the options:
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
