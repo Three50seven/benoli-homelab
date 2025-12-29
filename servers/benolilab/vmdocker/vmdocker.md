@@ -56,6 +56,53 @@ iface ens18 inet static
         dns-nameservers 8.8.8.8
 ```
 
+# Configure DNS
+Since Docker will be running on a VM, DNS will need to be configured to allow access to the internet.  While troubleshooting an issue with uptime kuma reaching out to the internet, I noticed I couldn't ping public DNS like google.com.  I made the following updates to my Docker VM host and it allowed me to configure DNS for my host so that internal docker containers could reach the internet as needed.
+
+Stop Docker (just in case of conflicts):
+
+```
+systemctl stop docker
+```
+Temporarily Fix DNS for Installation:
+```
+# Remove the existing, broken symlink if it exists
+rm -f /etc/resolv.conf
+
+# Create a basic resolv.conf file with a public DNS server
+echo "nameserver 9.9.9.9" | tee /etc/resolv.conf
+```
+Install systemd-resolved:
+```
+apt update
+apt upgrade
+apt install systemd-resolved
+
+Create a directory if it doesn't exist:
+```
+mkdir -p /etc/systemd/resolved.conf.d
+```
+Create a Configuration File: This file tells systemd-resolved to use your AdGuard IP and disable the local stub listener (which can conflict with your Dockerized AdGuard Home listening on port 53).
+```
+nano /etc/systemd/resolved.conf.d/adguard.conf
+```
+Add the settings for your adguard IP (in this case it's running on this same docker VM, so set DNS to this IP):
+```
+[Resolve]
+DNS=192.168.1.63
+DNSStubListener=no
+```
+Note: Using a specific drop-in file is generally better than editing the main /etc/systemd/resolved.conf file, as it prevents updates from overwriting your custom settings.
+
+Update the Symlink: This links the main resolver file to the new configuration.
+```
+ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+```
+Restart the Service:
+```
+systemctl restart systemd-resolved
+```
+
 # Setup Docker on new Debian Server (vmdocker):
 - NOTE: SSH into new debian server so that commands can be copy pasted:
 - src: https://docs.docker.com/engine/install/debian/
