@@ -46,6 +46,7 @@ services:
             - /var/run/docker.sock:/var/run/docker.sock
         restart: unless-stopped
         environment:
+            DOCKER_API_VERSION: 1.44
             WATCHTOWER_CLEANUP: true
             WATCHTOWER_DEBUG: true
             WATCHTOWER_ROLLING_RESTART: true
