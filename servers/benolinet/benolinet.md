@@ -202,3 +202,10 @@ Step-by-Step Migration Process
 - MAC Addresses: While less common to cause direct issues after remapping interfaces, if you have any static DHCP assignments or firewall rules tied to specific MAC addresses, ensure they align with the new VM's NICs. In most VM scenarios, the new VM will get new MAC addresses unless you manually assign the old ones in Proxmox (which is generally not recommended unless you absolutely need to for a specific reason).
 
 - By following these steps carefully, especially managing IP addresses during the transition and re-assigning interfaces, you should be able to smoothly migrate your OPNsense setup to a new VM.
+
+## After Restoring
+- You will need to update to the latest firmware - System > Firmware > Status > click "Check for updates"
+- Go to Plugins and install any with "missing" indicated next to the name, should be in **bold font**
+
+## Install/Enable dark theme for OPNsense Web
+To set up a dark theme in OPNsense 25, you generally install a theme plugin (like os-theme-dark or os-theme-rebellion) via System > Firmware > Plugins, then select it under System > Settings > General and apply changes, sometimes requiring a browser force-refresh. Official support for a built-in dark theme might also arrive in newer releases, but plugins offer immediate options now. 

@@ -17,6 +17,9 @@ Since Etcher works out of the box, here are those instructions, but Rufus can be
 
 Download Etcher from https://etcher.io. It will guide you through the process of selecting the ISO and your USB flash drive.
 
+Preferences: create a 50GB partition on ZFS for initial setup
+Additional storage can then be used to create a netpool ZFS pool for backups etc.
+
 ## Boot your Server from the USB Flash Drive
 
 Connect the USB flash drive to your server and make sure that booting from USB is enabled (check your servers firmware settings). Then follow the steps in the [installation wizard](https://pve.proxmox.com/wiki/Installation#chapter_installation).

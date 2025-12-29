@@ -1,25 +1,27 @@
 # Proxmox:
 
 # Partition the rest of the SSD (400.8GB)
-	ref: https://www.tecmint.com/linux-partition-managers/
-	Connect to proxmox via web interface
-	Run Shell from Datacenter > benolinas
-	```
-	# List all disks:
-	fdisk -l 
+ref: https://www.tecmint.com/linux-partition-managers/
+Connect to proxmox via web interface
+Run Shell from Datacenter > benolinas
+```
+# List all disks:
+fdisk -l 
 	
-	# Choose disk to manage:
-	fdisk /dev/sda
+# Choose disk to manage:
+fdisk /dev/sda
 	
-	#Show menu (m) free unpartitioned space (F):
-	#Create partition:
-	n, use defaults by just pressing enter for default partition number, first and last sectors
-	```
-	# Change partition file system type (t):
-	Enter the partition number you just created, choose "157" for ZFS, or "L" to list other options (q will quit the list paging)
+# Show menu (m) free unpartitioned space (F):
+# Create partition:
+n
+# use defaults by just pressing enter for default partition number, first and last sectors
+```
+
+# Change partition file system type (t):
+Enter the partition number you just created, choose "163" for ZFS, or "L" to list other options (q will quit the list paging)
 	
-	# Write the changes and create the partition (w):
-	Run lsblk to show all disks and partitions on the system.above
+# Write the changes and create the partition (w):
+Run lsblk to show all disks and partitions on the system.above
 	
 # Create a simple zpool for storage use in proxmox (note, this will not be RAID or offer any redundancy, it's just so the storage can be used for ISOs and container storage files, etc.)
 	# IMPORTANT - USE THE PARTITION NUMBER YOU CREATED ABOVE, IT MAY NOT BE sda4
