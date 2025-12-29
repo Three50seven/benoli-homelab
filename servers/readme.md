@@ -24,6 +24,12 @@ Additional storage can then be used to create a netpool ZFS pool for backups etc
 
 Connect the USB flash drive to your server and make sure that booting from USB is enabled (check your servers firmware settings). Then follow the steps in the [installation wizard](https://pve.proxmox.com/wiki/Installation#chapter_installation).
 
+For DNS resolution - make sure to set to a public DNS or internal (if already configured and this is not your first time setting up proxmox) - for example, set this to the docker container IP running adguard or pihole for example - whatever your primary DNS is.  This can also be configured through the GUI via node > System > DNS
+
+Setting DNS will allow apt packages etc. to reach where they need to in order to keep Proxmox updated.
+
+Once this is set, ping google.com from the shell and see if it resolves.  If so, update the packages under node > Update and set it to the non-paid version. Disabe the enterprise sources.
+
 # Create ZFS Pool with remaining diskspace:
 - See [partition-storage-device-linux.md](https://github.com/Three50seven/benoli-homelab/blob/main/linux-notes/partition-storage-device-linux.md) for notes on using the rest of the partition not used by the root file system of Proxmox
 - Run Command to view free space and disk usage stats in human readable format - note the "Type", you should see ZFS pools that can be imported
