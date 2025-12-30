@@ -28,7 +28,7 @@ For DNS resolution - make sure to set to a public DNS or internal (if already co
 
 Setting DNS will allow apt packages etc. to reach where they need to in order to keep Proxmox updated.
 
-Once this is set, ping google.com from the shell and see if it resolves.  If so, update the packages under node > Update and set it to the non-paid version. Disabe the enterprise sources.
+Once this is set, ping google.com from the shell and see if it resolves.  If so, update the packages under node > Update and set it to the non-paid version.  See [Update the APT section](#update-the-apt-repositories) for details.
 
 # Create ZFS Pool with remaining diskspace:
 - See [partition-storage-device-linux.md](https://github.com/Three50seven/benoli-homelab/blob/main/linux-notes/partition-storage-device-linux.md) for notes on using the rest of the partition not used by the root file system of Proxmox
@@ -57,7 +57,30 @@ sed -i.backup -z "s/res === null || res === undefined || \!res || res\n\t\t\t.da
 ```
 Or follow the manual process in the link above.
 
-# Update the APT (Advance Package Tool) Repositories in Proxmox Host:
+<h2 id="update-the-apt-repositories">Update the APT Repositories in Proxmox Host</h2>
+
+APT (Advanced Package Tool) repositories are used to update Proxmox VE and debian, the underlying OS.  You can update these manually or through the GUI.
+
+# Update APT Repos through GUI
+Via the Proxmox VE Web Interface, go to Datacenter > *node* > Updates > Repositories
+Disable the enterprise sources under the APT Repositories:
+Under `/etc/apt/sources.list.d/ceph.sources` click the `enterprise` component and click the *Disable* button 
+Under `/etc/apt/sources.list.d/pve-enterprise.sources` do the same for the `pve-enterprise` component.
+You should then be able to click the "Updates" parent section and click *Refresh*, you should see an output that shows a Hit for each of the repo end-points if DNS and all other updates were successful, i.e.
+```
+starting apt-get update
+Hit:1 http://deb.debian.org/debian trixie InRelease
+Hit:2 http://security.debian.org/debian-security trixie-security InRelease
+Hit:3 http://deb.debian.org/debian trixie-updates InRelease
+Hit:4 http://download.proxmox.com/debian/ceph-squid trixie InRelease
+Hit:5 http://download.proxmox.com/debian/pve trixie InRelease
+Reading package lists...
+TASK OK
+```
+If there were updates found, you can click *OK* or close the task output window and click the *>_Upgrade* button to proceed with updates. Note, if kernel updates were includes, it will suggest you reboot the Proxmox host.
+
+# Update APT Repos Manually
+
 - Guide: https://benheater.com/bare-metal-proxmox-laptop/amp/
 # Comment out the enterprise repositories - using Command Line:
 ```
