@@ -92,6 +92,22 @@ After making the changes, click Save.
 
 Ensure that all devices on your network are updated to use the new subnet.
 
+## Enable IP Passthrough on the ISP Router
+If the WAN IP is showing as a private IP on the OPNsense router, it is double-NAT'd and needs to have IP Passthrough enabled.
+Go to IP Passthrough: 
+- Navigate to Firewall > IP Passthrough.
+- Set Allocation Mode: Change the Allocation Mode to Passthrough.
+- Set Passthrough Mode: Change the Passthrough Mode to DHCPS-Fixed.
+- Select Device: In the Passthrough Fixed MAC Address section, choose the MAC address of your OPNsense WAN interface from the device list.
+- Use the MAC address assigned by Proxmox to the WAN Network device (from proxmox web GUI, go to OPNSense VM > Hardware > Network Device (net0) or whatever the interface assigned as the WAN is)
+- NOTE: after upgrading proxmox and remapping network bridges you may have to go update the MAC address again in the IP Passthrough, or set it back in Proxmox to what you originally had.
+
+Disable Other Features (Recommended):
+- Go to Home Network > Wi-Fi and set both 2.4 GHz and 5 GHz Wi-Fi Operation to Off to prevent interference.
+- Go to Firewall > Packet Filter and click the button to Disable Packet Filters.
+- Save and Reboot: Save the changes, then go to the Device tab and Restart Device.
+- Also restart the OPNsense router and you should now see the WAN address as a public-facing IP instead of a private IP
+
 # CREATE PROXMOX BACKUPS
 References: https://www.vinchin.com/vm-backup/proxmox-offsite-backup.html
 - https://pve.proxmox.com/wiki/Backup_and_Restore
@@ -106,6 +122,7 @@ Offsite backup stored in Dropbox
 
 # WireGuard Config and setup
 ref: https://docs.opnsense.org/manual/how-tos/wireguard-client.html
+Note: if OPNsense is using a private IP for it's WAN interface, you will need to setup a port forwarding rule on the upstream modem/router to forward UDP traffic on your WireGuard port to the private WAN IP address of your OPNsense router.
 
 # Setup Dynamic DNS (to update hostname with public IP if it changes from ISP)
 Make sure to add os-ddclient (Dynamic DNS Service) to OPNsense to update the noip domain with an updated IP if it every changes
