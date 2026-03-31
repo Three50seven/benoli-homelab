@@ -4,6 +4,8 @@ secrets:
         file: ./secrets/.plex_claim    
     certgen_notifications_discord_hook_url:
         file: ./secrets/.certgen_notifications_discord_hook_url
+    vaultwarden_domain:
+        file: ./secrets/.vaultwarden_domain
 x-logging: &default-logging
   driver: json-file
   options:
@@ -130,6 +132,36 @@ services:
           timeout: 5s
           retries: 3
           start_period: 10s
+    vaultwarden:
+      container_name: vaultwarden
+      image: vaultwarden/server:latest    
+      restart: unless-stopped
+      logging: *default-logging
+      networks:
+        server_net:
+          ipv4_address: 172.18.0.26
+      environment:
+        # Set the domain to allow Vaultwarden to verify the TLS certificate if using a reverse proxy.
+        # If not using a reverse proxy, you can set it to your server's IP or a local domain (e.g., 'https://vaultwarden.lan').
+        DOMAIN_FILE: /run/secrets/vaultwarden_domain
+        SIGNUPS_ALLOWED: "false" # Deactivate this with "false" after you have created your account so that no strangers can register
+      secrets:
+        - vaultwarden_domain
+      volumes:
+        # This maps the local ./vw-data directory to the container's /data directory for persistence.
+        - vw_data:/data
+      ports:
+        # Maps port 8000 on your host to port 80 on the container.
+        # If using a reverse proxy, you might bind to a local interface (e.g., 127.0.0.1:8000:80).
+        - "11357:80"
+      labels:
+        description: "Vault Warden is an alternative implementation of the Bitwarden server API in Rust, including the Web Vault."
+        com.centurylinklabs.watchtower.enable: "true"
+      healthcheck:
+          test: ["CMD", "ls", "/data"]
+          interval: 10s
+          timeout: 30s
+          retries: 3
 volumes:
     nginx_proxy_config:
         name: nginx_proxy_config
@@ -147,6 +179,8 @@ volumes:
         name: plex_server_transcode
     plex_server_media:
         name: plex_server_media
+    vw_data:
+        name: vw_data
 networks:
     server_net:
         name: server_net
