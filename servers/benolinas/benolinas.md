@@ -19,12 +19,17 @@ apt install nfs-kernel-Server
 ```
 - export the zfs filesystem by adding the following line to /etc/exports 
 - no_root_squash allows Docker client to add additional users as needed to the share and take ownership of specific directories that should only be used by a specific service
-/naspool/share 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
 
+old: /naspool/share 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
+
+new (so jellyfin and plex can share the same source): /naspool/share 192.168.1.0/24(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000)
 - Apply the Export:
 ```
 exportfs -a
 systemctl restart nfs-kernel-server
+
+# or apply without restarting the service:
+exportfs -rav
 
 # Verify the mount options:
 mount | grep naspool

@@ -49,6 +49,42 @@ services:
             description: "Plex organizes video, music and photos from personal media libraries and streams them to smart TVs, streaming boxes and mobile devices."
             com.centurylinklabs.watchtower.enable: "true"
             docker-volume-backup.stop-during-backup: "true"
+    jellyfin:
+        container_name: jellyfin
+        image: linuxserver/jellyfin:latest
+        logging: *default-logging
+        networks:
+          server_net:
+            ipv4_address: 172.18.0.15
+        ports:
+            - "8096:8096"
+            - "8920:8920" # Optional: HTTPS port
+        restart: unless-stopped
+        environment:
+            - TZ=America/New_York
+            - PUID=1000
+            - PGID=1000
+        volumes:
+            - jellyfin_server_config:/config
+            # Shared media drives mounted as READ-ONLY (:ro)
+            - /mnt/naspool:/naspool:ro
+            - /mnt/sdb:/localmedia:ro
+        devices:
+            # Shared hardware devices for potential TV tuners/capture cards
+            - /dev/bus/usb:/dev/bus/usb	
+            - /dev/dvb:/dev/dvb
+            # Note: If using Intel QuickSync or AMD GPU for transcoding, 
+            # you may want to add: - /dev/dri:/dev/dri
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+            interval: 1m
+            timeout: 15s
+            retries: 3
+            start_period: 1m
+        labels:
+            description: "Jellyfin is a Free Software Media System that puts you in control of managing and streaming your media."
+            com.centurylinklabs.watchtower.enable: "true"
+            docker-volume-backup.stop-during-backup: "true"
     adguardhome:
         container_name: adguardhome
         image: adguard/adguardhome
@@ -181,6 +217,8 @@ volumes:
         name: plex_server_media
     vw_data:
         name: vw_data
+    jellyfin_server_config:
+        name: jellyfin_server_config
 networks:
     server_net:
         name: server_net

@@ -77,7 +77,7 @@ Install systemd-resolved:
 apt update
 apt upgrade
 apt install systemd-resolved
-
+```
 Create a directory if it doesn't exist:
 ```
 mkdir -p /etc/systemd/resolved.conf.d
@@ -163,6 +163,30 @@ apt install nfs-common
 ```
 mkdir /mnt/naspool
 mkdir /mnt/sdb
+```
+Mount the naspool share and local media directory (where the media files will be stored for plex, jellyfin, etc. - this is the directory that will be shared by the NAS server to the docker host, and then mounted as a volume in the docker compose for each media service):
+```
+# 1. Stop the containers so they release the mount
+docker compose down
+
+# 2. Force unmount the NFS share from the host
+umount -f -l /mnt/naspool
+
+# 3. Remount it cleanly using your /etc/fstab configuration
+mount -a
+```
+Verify that you can see the files on the host machine first:
+```
+ls -la /mnt/naspool/Plex
+```
+
+Once the host machine can successfully read the directory, bring your media servers back online in detached mode:
+```
+docker compose up -d
+```
+Run the verification check to ensure the container bridge is finally working:
+```
+docker exec -it plex ls -la /naspool/Plex
 ```
 --NOTE: CHOOSE EITHER CIFS OR NFS:
 -mount NAS directory as CIFS (SMB):
