@@ -49,6 +49,35 @@ services:
             description: "Plex organizes video, music and photos from personal media libraries and streams them to smart TVs, streaming boxes and mobile devices."
             com.centurylinklabs.watchtower.enable: "true"
             docker-volume-backup.stop-during-backup: "true"
+    tvheadend:
+      container_name: tvheadend
+      image: lscr.io/linuxserver/tvheadend:latest
+      logging: *default-logging
+      networks:
+        server_net:
+          ipv4_address: 172.18.0.27
+      ports:
+        - "9981:9981" # Web UI
+        - "9982:9982" # HTSP Streaming port
+      restart: unless-stopped
+      environment:
+        - TZ=America/New_York
+        - PUID=1000
+        - PGID=1000
+      volumes:
+        - tvheadend_config:/config
+      devices:
+        - /dev/bus/usb:/dev/bus/usb
+        - /dev/dvb:/dev/dvb
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:9981/"]
+        interval: 1m
+        timeout: 15s
+        retries: 3
+        start_period: 30s
+      labels:
+        description: "Tvheadend is a TV streaming server and recorder for Linux supporting DVB-S, DVB-S2, DVB-C, DVB-T, ATSC, ISDB-T, IPTV, SAT>IP and HDHomeRun."
+        com.centurylinklabs.watchtower.enable: "true"
     jellyfin:
         container_name: jellyfin
         image: linuxserver/jellyfin:latest
@@ -68,13 +97,10 @@ services:
             - jellyfin_server_config:/config
             # Shared media drives mounted as READ-ONLY (:ro)
             - /mnt/naspool:/naspool:ro
-            - /mnt/sdb:/localmedia:ro
-        devices:
-            # Shared hardware devices for potential TV tuners/capture cards
-            - /dev/bus/usb:/dev/bus/usb	
-            - /dev/dvb:/dev/dvb
-            # Note: If using Intel QuickSync or AMD GPU for transcoding, 
-            # you may want to add: - /dev/dri:/dev/dri
+            - /mnt/sdb:/localmedia:ro        
+        depends_on:
+          tvheadend: # Tell Jellyfin to wait for Tvheadend to pass healthcheck
+            condition: service_healthy
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
             interval: 1m
@@ -217,6 +243,8 @@ volumes:
         name: plex_server_media
     vw_data:
         name: vw_data
+    tvheadend_config:
+        name: tvheadend_config
     jellyfin_server_config:
         name: jellyfin_server_config
 networks:
