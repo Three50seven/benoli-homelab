@@ -537,6 +537,13 @@ scripts/zfs-backup-trigger.sh daily 7 >> /proc/1/fd/1 2>&1
 docker exec -it jellyfin curl -I "http://172.18.0.27:9981/playlist/channels"
 ```
 - Tvheadend container was setup to pass the tuner through to Jellyfin
+- once tvheadend is setup, add anonymous access entry to allow jellyfin to access the tvheadend web UI and stream live TV through the tuner
+    - in Jellyfin, go to Dashboard > Live TV > add TV Tuner Device > select M3U Tuner > for the URL, enter the IP address of the Tvheadend container and the port for the web UI 
+    - File or URL: <http://172.18.0.27:9981/playlist/channels>
+    - Update limit to 1 stream (or whatever the hardware can support) and save
+    - Update the channel mappings by click Add Provider
+    - Enter the URL <http://172.18.0.27:9981/xmltv/channels> save
+    - If you don't want to use anonymous access, you can create a user in Tvheadend and use those credentials in the URL like so: http://username:password@
 - Superuser Jellyfin setup instructions (if locked out of main web UI):
 - The Fix: Create a Superuser Override
 Tvheadend checks for a special file named superuser inside its configuration directory. If that file exists, it will completely bypass all other access control entries and let you back in as a master administrator.
