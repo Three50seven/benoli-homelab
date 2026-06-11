@@ -529,3 +529,59 @@ scripts/zfs-backup-trigger.sh daily 7 >> /proc/1/fd/1 2>&1
     chmod +x /usr/local/bin/supercronic
 ```
 - Note: use 'apk add' manually, once inside the shell, to add any additional libraries or packages to the base Alpine OS.
+
+# Jellyfin - media server for streaming and managing media
+- Add live TV and tuner support with Tvheadend:
+- test url to access tvheadend web UI inside docker host: 
+```bash
+docker exec -it jellyfin curl -I "http://172.18.0.27:9981/playlist/channels"
+```
+- Tvheadend container was setup to pass the tuner through to Jellyfin
+- Superuser Jellyfin setup instructions (if locked out of main web UI):
+- The Fix: Create a Superuser Override
+Tvheadend checks for a special file named superuser inside its configuration directory. If that file exists, it will completely bypass all other access control entries and let you back in as a master administrator.
+
+Run these exact commands on your Docker host terminal:
+
+1. Create the master recovery file
+We will inject a temporary administrative user directly into your Tvheadend configuration volume:
+
+```bash
+tee /var/lib/docker/volumes/tvheadend_config/_data/superuser <<EOF
+{
+    "username": "recovery_admin",
+    "password": "TemporaryPassword123"
+}
+EOF
+```
+(Note: If your local volume is named slightly differently or located in a specific bind-mount folder instead of standard Docker volumes, adjust the path to your /config directory accordingly).
+
+2. Restart the container to apply the bypass
+Bash
+docker compose restart tvheadend
+Step 2: Fix the Settings in the GUI
+Open your browser and go to http://<DOCKER_HOST_IP>:9981.
+
+When the login prompt appears, use the temporary credentials:
+
+Username: recovery_admin
+
+Password: TemporaryPassword123
+
+You will have full access again! Go straight to Configuration > Users > Access Entries.
+
+Find that anonymous rule you just made and modify it:
+
+Change "Allowed networks" from 0.0.0.0/0 (if that's what it was) explicitly to 172.18.0.0/16.
+
+By specifying the Docker network, it will no longer intercept your workstation's home LAN IP (192.168.x.x).
+
+Double-check your original jellyfin explicit user or your own admin account rules to make sure they are enabled.
+
+Click Save.
+
+Clean up (Optional)
+Once you confirm your standard accounts work again from your workstation, you can safely remove the temporary superuser file from your terminal so that back door isn't left open.
+```bash 
+rm /var/lib/docker/volumes/tvheadend_config/_data/superuser
+```
