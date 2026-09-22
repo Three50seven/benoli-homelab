@@ -1,5 +1,6 @@
 # Plex Host Setup 
-	- also see fstab setup for naspool in [vmdocker.md](https://github.com/Three50seven/benoli-homelab/blob/main/servers/benolilab/vmdocker/vmdocker.md)
+also see fstab setup for naspool in [vmdocker.md](https://github.com/Three50seven/benoli-homelab/blob/main/servers/benolilab/vmdocker/vmdocker.md)
+
 # Add TV Tuner device for plex container to use:
 To pass a USB device from Proxmox to a virtual machine (VM)
 
